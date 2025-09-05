@@ -11,6 +11,14 @@
         background: rgba(0,0,0,0.45); padding: 8px 10px; border-radius: 8px; user-select: none;
       }
       #info a { color: #9dd7ff; text-decoration: none; }
+      #ui {
+        position: absolute; top: 10px; right: 10px; color: #e6e6e6; font: 12px/1.25 system-ui, -apple-system, Segoe UI, Roboto, Arial;
+        background: rgba(0,0,0,0.55); padding: 10px 12px; border-radius: 10px; width: 260px; box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      }
+      #ui .row { display: grid; grid-template-columns: 1fr 3fr 48px; gap: 8px; align-items: center; margin: 6px 0; }
+      #ui label { color: #c9d1d9; }
+      #ui input[type="range"] { width: 100%; }
+      #ui .val { text-align: right; font-variant-numeric: tabular-nums; color: #9fb3c8; }
     </style>
     <!-- Using ES modules from CDN (examples/jsm) -->
   </head>
@@ -60,8 +68,8 @@
       scene.add(dir);
 
       // ----- center red sphere -----
-      const SPHERE_RADIUS = 1.0;
-      const sphereGeo = new THREE.SphereGeometry(SPHERE_RADIUS, 48, 32);
+      const SPHERE_BASE_RADIUS = 0.5; // default/base; UI scales this
+      const sphereGeo = new THREE.SphereGeometry(SPHERE_BASE_RADIUS, 48, 32);
       const sphereMat = new THREE.MeshStandardMaterial({ color: 0xff3333, roughness: 0.6, metalness: 0.05 });
       const sphere = new THREE.Mesh(sphereGeo, sphereMat);
       sphere.castShadow = false;
@@ -70,10 +78,10 @@
 
       // ----- layout parameters -----
       const COUNT = 5;
-      const RING_RADIUS = 2.6; // distance of images from center
       const PLY_OFFSET = 0.28; // how much further the PLY sits behind the image (away from center)
-      const SPRITE_HEIGHT = 1.1; // world units; width auto by aspect
       const ELEVATION = 0.0; // y-position for both images and PLYs
+      const DEFAULTS = { sphereRadius: SPHERE_BASE_RADIUS, ringRadius: 2.6, spriteHeight: 1.1 };
+      const params = { ...DEFAULTS };
 
       const group = new THREE.Group();
       scene.add(group);
@@ -81,6 +89,10 @@
       // helpers
       const texLoader = new THREE.TextureLoader();
       const plyLoader = new PLYLoader();
+
+      // storage for created meshes for interactive updates
+      const planes = new Array(COUNT); // { mesh, aspect }
+      const models = new Array(COUNT); // { mesh }
 
       function polarPosition(radius, angle, y = 0) {
         return new THREE.Vector3(
@@ -90,24 +102,51 @@
         );
       }
 
+      function updateLayout() {
+        // update sphere size via scaling
+        const sphereScale = params.sphereRadius / SPHERE_BASE_RADIUS;
+        sphere.scale.setScalar(sphereScale);
+
+        for (let k = 0; k < COUNT; k++) {
+          const angleVertex = (k / COUNT) * Math.PI * 2 - Math.PI / 2;
+          const angle = angleVertex + Math.PI / COUNT; // edge midpoint
+
+          const p = planes[k];
+          if (p && p.mesh) {
+            p.mesh.position.copy(polarPosition(params.ringRadius, angle, ELEVATION));
+            p.mesh.lookAt(0, ELEVATION, 0);
+            p.mesh.scale.set(params.spriteHeight * p.aspect, params.spriteHeight, 1);
+          }
+
+          const m = models[k];
+          if (m && m.mesh) {
+            m.mesh.position.copy(polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION));
+            m.mesh.lookAt(0, ELEVATION, 0);
+          }
+        }
+      }
+
       function addSpriteWithPLY(index) {
         const i = index + 1; // 1..5
-        const angle = (index / COUNT) * Math.PI * 2 - Math.PI / 2; // start at top
+        const angleVertex = (index / COUNT) * Math.PI * 2 - Math.PI / 2; // vertex angle, start at top
+        const angle = angleVertex + Math.PI / COUNT; // shift to edge midpoint
 
-        // Sprite (PNG)
+        // Image as Plane (PNG) placed at edge midpoint and oriented along edge direction (tangent)
         const pngPath = `resources/image/${i}.png`;
         texLoader.load(
           pngPath,
           (tex) => {
             tex.colorSpace = THREE.SRGBColorSpace;
-            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true, depthWrite: false });
-            const sprite = new THREE.Sprite(mat);
-            const pos = polarPosition(RING_RADIUS, angle, ELEVATION);
-            sprite.position.copy(pos);
-            // Scale sprite to a fixed height, keep aspect
             const aspect = tex.image ? (tex.image.width / tex.image.height) : 1;
-            sprite.scale.set(SPRITE_HEIGHT * aspect, SPRITE_HEIGHT, 1);
-            group.add(sprite);
+            const geo = new THREE.PlaneGeometry(1, 1); // scale to size later
+            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.06, depthWrite: false, side: THREE.DoubleSide });
+            const plane = new THREE.Mesh(geo, mat);
+            plane.position.copy(polarPosition(params.ringRadius, angle, ELEVATION));
+            // Face toward center so local X aligns with tangential direction
+            plane.lookAt(0, ELEVATION, 0);
+            plane.scale.set(params.spriteHeight * aspect, params.spriteHeight, 1);
+            group.add(plane);
+            planes[index] = { mesh: plane, aspect };
           },
           undefined,
           (err) => {
@@ -120,7 +159,11 @@
         plyLoader.load(
           plyPath,
           (geom) => {
-            const mat = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.9, metalness: 0.0 });
+            // Ensure normals and vertex colors are used
+            if (!geom.attributes.normal) {
+              geom.computeVertexNormals();
+            }
+            const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.0 });
             const mesh = new THREE.Mesh(geom, mat);
 
             // Fit model to a target radius for consistency
@@ -132,13 +175,14 @@
               mesh.scale.setScalar(s);
             }
 
-            const base = polarPosition(RING_RADIUS + PLY_OFFSET, angle, ELEVATION);
+            const base = polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION);
             mesh.position.copy(base);
 
             // Face toward center
             mesh.lookAt(0, ELEVATION, 0);
 
             group.add(mesh);
+            models[index] = { mesh };
           },
           undefined,
           (err) => {
@@ -165,6 +209,41 @@
         requestAnimationFrame(tick);
       }
       tick();
+
+      // ----- UI (sliders) -----
+      const ui = document.createElement('div');
+      ui.id = 'ui';
+      ui.innerHTML = `
+        <div class="row">
+          <label for="sphereRadius">Sphere Radius</label>
+          <input id="sphereRadius" type="range" min="0.1" max="1.5" step="0.01" value="${DEFAULTS.sphereRadius}">
+          <div class="val" id="sphereRadiusVal">${DEFAULTS.sphereRadius.toFixed(2)}</div>
+        </div>
+        <div class="row">
+          <label for="ringRadius">Image Distance</label>
+          <input id="ringRadius" type="range" min="1.0" max="6.0" step="0.01" value="${DEFAULTS.ringRadius}">
+          <div class="val" id="ringRadiusVal">${DEFAULTS.ringRadius.toFixed(2)}</div>
+        </div>
+        <div class="row">
+          <label for="spriteHeight">Image Size</label>
+          <input id="spriteHeight" type="range" min="0.2" max="2.5" step="0.01" value="${DEFAULTS.spriteHeight}">
+          <div class="val" id="spriteHeightVal">${DEFAULTS.spriteHeight.toFixed(2)}</div>
+        </div>
+      `;
+      document.body.appendChild(ui);
+
+      function bindSlider(id, key) {
+        const el = document.getElementById(id);
+        const val = document.getElementById(id + 'Val');
+        el.addEventListener('input', () => {
+          params[key] = parseFloat(el.value);
+          val.textContent = params[key].toFixed(2);
+          updateLayout();
+        });
+      }
+      bindSlider('sphereRadius', 'sphereRadius');
+      bindSlider('ringRadius', 'ringRadius');
+      bindSlider('spriteHeight', 'spriteHeight');
     </script>
   </body>
  </html>
