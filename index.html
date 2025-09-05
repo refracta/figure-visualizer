@@ -85,7 +85,7 @@
       const ELEVATION = 0.0; // y-position for both images and PLYs
       const DEG2RAD = Math.PI / 180;
       const RAD2DEG = 180 / Math.PI;
-      const DEFAULTS = { centerSize: 1.25, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff', useCenterImage: true, globalYaw: 0, globalPitch: 0, globalRoll: 0 };
+      const DEFAULTS = { centerSize: 1.25, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff', useCenterImage: true, globalYaw: 0, globalPitch: 0, globalRoll: 0, globalH: 0 };
       const params = { ...DEFAULTS };
       // Default yaw per PLY (deg) to face edge tangent, normalized to [0, 360)
       const DEFAULT_PLY_YAW_DEG = Array.from({ length: COUNT }, (_, k) => {
@@ -99,6 +99,7 @@
       params.plyYaw = DEFAULT_PLY_YAW_DEG.map(norm360);
       params.plyPitch = Array.from({ length: COUNT }, () => 0);
       params.plyRoll = Array.from({ length: COUNT }, () => 0);
+      params.plyH = Array.from({ length: COUNT }, () => 0);
 
       const group = new THREE.Group();
       scene.add(group);
@@ -157,11 +158,16 @@
           const m = models[k];
           if (m && m.mesh) {
             m.mesh.position.copy(polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION));
-            // Rotate each point cloud around its own center: add global + per-PLY rotations (degrees)
+            // Base orientation from Euler (local), then pre-multiply by H-Line (world tangent) axis rotation
             const yawDeg = (params.plyYaw[k] || 0) + (params.globalYaw || 0);
             const pitchDeg = (params.plyPitch[k] || 0) + (params.globalPitch || 0);
             const rollDeg = (params.plyRoll[k] || 0) + (params.globalRoll || 0);
-            m.mesh.rotation.set(pitchDeg * DEG2RAD, yawDeg * DEG2RAD, rollDeg * DEG2RAD);
+            const qEuler = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitchDeg * DEG2RAD, yawDeg * DEG2RAD, rollDeg * DEG2RAD, 'XYZ'));
+            const hAxis = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle)).normalize();
+            const hDeg = (params.plyH[k] || 0) + (params.globalH || 0);
+            const qH = new THREE.Quaternion().setFromAxisAngle(hAxis, hDeg * DEG2RAD);
+            const q = qH.multiply(qEuler); // world-axis rotation first
+            m.mesh.quaternion.copy(q);
             if (m.baseScale) {
               m.mesh.scale.setScalar(m.baseScale * params.pointScale);
             }
@@ -222,11 +228,16 @@
 
             const base = polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION);
             points.position.copy(base);
-            // Apply per-PLY + global rotations (deg)
+            // Apply per-PLY + global rotations (deg) plus H-Line (world tangent) axis rotation
             const yawDeg = (params.plyYaw[index] || 0) + (params.globalYaw || 0);
             const pitchDeg = (params.plyPitch[index] || 0) + (params.globalPitch || 0);
             const rollDeg = (params.plyRoll[index] || 0) + (params.globalRoll || 0);
-            points.rotation.set(pitchDeg * DEG2RAD, yawDeg * DEG2RAD, rollDeg * DEG2RAD);
+            const qEuler = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitchDeg * DEG2RAD, yawDeg * DEG2RAD, rollDeg * DEG2RAD, 'XYZ'));
+            const hAxis = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle)).normalize();
+            const hDeg = (params.plyH[index] || 0) + (params.globalH || 0);
+            const qH = new THREE.Quaternion().setFromAxisAngle(hAxis, hDeg * DEG2RAD);
+            const q = qH.multiply(qEuler);
+            points.quaternion.copy(q);
 
             pcGroup.add(points);
             models[index] = { mesh: points, baseScale };
@@ -342,6 +353,11 @@
             <input id="globalPitch" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalPitch}">
             <div class="val" id="globalPitchVal">${DEFAULTS.globalPitch.toFixed(0)}°</div>
           </div>
+          <div class="row">
+            <label for="globalH">Global H-Line</label>
+            <input id="globalH" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalH}">
+            <div class="val" id="globalHVal">${DEFAULTS.globalH.toFixed(0)}°</div>
+          </div>
         </div>
 
         <div class="section">
@@ -430,6 +446,35 @@
             <div class="val" id="plyPitch5Val">0°</div>
           </div>
         </div>
+
+        <div class="section">
+          <div class="title">H-Line (Per PLY)</div>
+          <div class="row">
+            <label for="plyH1">PLY 1 H</label>
+            <input id="plyH1" type="range" min="0" max="360" step="1" value="0">
+            <div class="val" id="plyH1Val">0°</div>
+          </div>
+          <div class="row">
+            <label for="plyH2">PLY 2 H</label>
+            <input id="plyH2" type="range" min="0" max="360" step="1" value="0">
+            <div class="val" id="plyH2Val">0°</div>
+          </div>
+          <div class="row">
+            <label for="plyH3">PLY 3 H</label>
+            <input id="plyH3" type="range" min="0" max="360" step="1" value="0">
+            <div class="val" id="plyH3Val">0°</div>
+          </div>
+          <div class="row">
+            <label for="plyH4">PLY 4 H</label>
+            <input id="plyH4" type="range" min="0" max="360" step="1" value="0">
+            <div class="val" id="plyH4Val">0°</div>
+          </div>
+          <div class="row">
+            <label for="plyH5">PLY 5 H</label>
+            <input id="plyH5" type="range" min="0" max="360" step="1" value="0">
+            <div class="val" id="plyH5Val">0°</div>
+          </div>
+        </div>
       `;
       document.body.appendChild(ui);
 
@@ -454,7 +499,7 @@
             val.textContent = params[key].toFixed(1) + ' px';
           } else if (key === 'pointScale') {
             val.textContent = params[key].toFixed(2) + '×';
-          } else if (key === 'globalYaw' || key === 'globalPitch' || key === 'globalRoll') {
+          } else if (key === 'globalYaw' || key === 'globalPitch' || key === 'globalRoll' || key === 'globalH') {
             val.textContent = params[key].toFixed(0) + '°';
           } else {
             val.textContent = params[key].toFixed(2);
@@ -517,6 +562,12 @@
       bindSlider('globalYaw', 'globalYaw');
       bindSlider('globalPitch', 'globalPitch');
       bindSlider('globalRoll', 'globalRoll');
+      bindSlider('globalH', 'globalH');
+      bindAngleSlider('plyH1', params.plyH, 0);
+      bindAngleSlider('plyH2', params.plyH, 1);
+      bindAngleSlider('plyH3', params.plyH, 2);
+      bindAngleSlider('plyH4', params.plyH, 3);
+      bindAngleSlider('plyH5', params.plyH, 4);
       bindColor('bgColor', 'bgColor');
       // initialize background from default
       updateBackground();
