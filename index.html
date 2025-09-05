@@ -80,6 +80,8 @@
       const COUNT = 5;
       const PLY_OFFSET = 0.28; // how much further the PLY sits behind the image (away from center)
       const ELEVATION = 0.0; // y-position for both images and PLYs
+      const DEG2RAD = Math.PI / 180;
+      const RAD2DEG = 180 / Math.PI;
       const DEFAULTS = { sphereRadius: SPHERE_BASE_RADIUS, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff' };
       const params = { ...DEFAULTS };
       // Default yaw per PLY (deg) to face edge tangent
@@ -101,8 +103,6 @@
       // storage for created meshes for interactive updates
       const planes = new Array(COUNT); // { mesh, aspect }
       const models = new Array(COUNT); // { mesh }
-      const DEG2RAD = Math.PI / 180;
-      const RAD2DEG = 180 / Math.PI;
 
       function polarPosition(radius, angle, y = 0) {
         return new THREE.Vector3(
