@@ -96,6 +96,8 @@
 
       const group = new THREE.Group();
       scene.add(group);
+      const pcGroup = new THREE.Group(); // holds only the point clouds
+      group.add(pcGroup);
 
       // helpers
       const texLoader = new THREE.TextureLoader();
@@ -118,9 +120,9 @@
         const sphereScale = params.sphereRadius / SPHERE_BASE_RADIUS;
         sphere.scale.setScalar(sphereScale);
 
-        // apply global rotation (degrees -> radians) to the whole group
+        // apply global rotation (degrees -> radians) to point clouds only
         const gYaw = (params.globalYaw || 0) * DEG2RAD;
-        group.rotation.set(0, gYaw, 0);
+        pcGroup.rotation.set(0, gYaw, 0);
 
         for (let k = 0; k < COUNT; k++) {
           const angleVertex = (k / COUNT) * Math.PI * 2 - Math.PI / 2;
@@ -203,7 +205,7 @@
             const yaw = (params.plyRotation[index] || 0) * DEG2RAD;
             points.rotation.set(0, yaw, 0);
 
-            group.add(points);
+            pcGroup.add(points);
             models[index] = { mesh: points, baseScale };
           },
           undefined,
@@ -240,11 +242,6 @@
           <label for="bgColor">Background</label>
           <input id="bgColor" type="color" value="${DEFAULTS.bgColor}">
           <div class="val" id="bgColorVal">${DEFAULTS.bgColor.toUpperCase()}</div>
-        </div>
-        <div class="row">
-          <label for="globalYaw">Global Rotation</label>
-          <input id="globalYaw" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalYaw}">
-          <div class="val" id="globalYawVal">${DEFAULTS.globalYaw.toFixed(0)}°</div>
         </div>
         <div class="row">
           <label for="sphereRadius">Sphere Radius</label>
@@ -295,6 +292,11 @@
           <label for="plyRot5">PLY 5 Rot</label>
           <input id="plyRot5" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_ROT_DEG[4].toFixed(0)}">
           <div class="val" id="plyRot5Val">${DEFAULT_PLY_ROT_DEG[4].toFixed(0)}°</div>
+        </div>
+        <div class="row">
+          <label for="globalYaw">PC Global Rot</label>
+          <input id="globalYaw" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalYaw}">
+          <div class="val" id="globalYawVal">${DEFAULTS.globalYaw.toFixed(0)}°</div>
         </div>
       `;
       document.body.appendChild(ui);
