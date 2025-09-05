@@ -85,7 +85,7 @@
       const ELEVATION = 0.0; // y-position for both images and PLYs
       const DEG2RAD = Math.PI / 180;
       const RAD2DEG = 180 / Math.PI;
-      const DEFAULTS = { centerSize: 1.25, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff', useCenterImage: true, globalYaw: 0, globalPitch: 0, globalRoll: 0, globalH: 0, dBase: PLY_OFFSET, globalD: 0, globalUD: 0, globalLR: 0 };
+      const DEFAULTS = { centerSize: 1.25, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff', useCenterImage: true, showLabels: true, globalYaw: 0, globalPitch: 0, globalRoll: 0, globalH: 0, dBase: PLY_OFFSET, globalD: 0, globalUD: 0, globalLR: 0 };
       const params = { ...DEFAULTS };
       // Default yaw per PLY (deg) to face edge tangent, normalized to [0, 360)
       const DEFAULT_PLY_YAW_DEG = Array.from({ length: COUNT }, (_, k) => {
@@ -136,6 +136,7 @@
         const vPtScale = num('pointScale'); if (!isNaN(vPtScale)) params.pointScale = vPtScale;
         const vBG = str('bgColor'); if (vBG) params.bgColor = vBG;
         const vCenterImg = bool('useCenterImage'); if (typeof vCenterImg === 'boolean') params.useCenterImage = vCenterImg;
+        const vShowLabels = bool('showLabels'); if (typeof vShowLabels === 'boolean') params.showLabels = vShowLabels;
         const vGY = num('globalYaw'); if (!isNaN(vGY)) params.globalYaw = norm360(vGY);
         const vGR = num('globalRoll'); if (!isNaN(vGR)) params.globalRoll = norm360(vGR);
         const vGP = num('globalPitch'); if (!isNaN(vGP)) params.globalPitch = norm360(vGP);
@@ -160,6 +161,31 @@
       // helpers
       const texLoader = new THREE.TextureLoader();
       const plyLoader = new PLYLoader();
+
+      function makeNumberTexture(n) {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const size = 128 * dpr;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, size, size);
+        // background circle
+        const r = size * 0.45;
+        ctx.beginPath();
+        ctx.arc(size/2, size/2, r, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fill();
+        // number
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `${Math.floor(size*0.55)}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+        ctx.fillText(String(n), size/2, size/2);
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.needsUpdate = true;
+        return tex;
+      }
 
       // storage for created meshes for interactive updates
       const planes = new Array(COUNT); // { mesh, aspect }
@@ -214,6 +240,12 @@
             p.mesh.position.copy(polarPosition(params.ringRadius, angle, ELEVATION));
             p.mesh.lookAt(0, ELEVATION, 0);
             p.mesh.scale.set(params.spriteHeight * p.aspect, params.spriteHeight, 1);
+            // update label size/visibility
+            if (p.label) {
+              const labelSize = params.spriteHeight * 0.38;
+              p.label.scale.set(labelSize, labelSize, 1);
+              p.label.visible = !!params.showLabels;
+            }
           }
 
           const m = models[k];
@@ -260,7 +292,17 @@
             plane.lookAt(0, ELEVATION, 0);
             plane.scale.set(params.spriteHeight * aspect, params.spriteHeight, 1);
             group.add(plane);
-            planes[index] = { mesh: plane, aspect };
+            // Add label sprite
+            const lblTex = makeNumberTexture(i);
+            const lblMat = new THREE.SpriteMaterial({ map: lblTex, transparent: true, depthWrite: false, depthTest: false });
+            const label = new THREE.Sprite(lblMat);
+            label.renderOrder = 10;
+            const labelSize = params.spriteHeight * 0.38;
+            label.scale.set(labelSize, labelSize, 1);
+            label.visible = !!params.showLabels;
+            plane.add(label);
+
+            planes[index] = { mesh: plane, aspect, label };
           },
           undefined,
           (err) => {
@@ -355,6 +397,11 @@
             <label for="bgColor">Background</label>
             <input id="bgColor" type="color" value="${params.bgColor}">
             <div class="val" id="bgColorVal">${params.bgColor.toUpperCase()}</div>
+          </div>
+          <div class="row">
+            <label for="showLabels">Image Labels</label>
+            <input id="showLabels" type="checkbox" ${params.showLabels ? 'checked' : ''}>
+            <div class="val" id="showLabelsVal">${params.showLabels ? 'ON' : 'OFF'}</div>
           </div>
           <div class="row">
             <label for="useCenterImage">Center Image</label>
@@ -718,6 +765,7 @@
           syncURL();
         });
       }
+      bindCheckbox('showLabels', 'showLabels');
       bindCheckbox('useCenterImage', 'useCenterImage');
       bindSlider('centerSize', 'centerSize');
       bindSlider('ringRadius', 'ringRadius');
@@ -794,6 +842,7 @@
         if (params.pointScale !== DEFAULTS.pointScale) sp.set('pointScale', String(round(params.pointScale)));
         if ((params.bgColor || '').toLowerCase() !== (DEFAULTS.bgColor || '').toLowerCase()) sp.set('bgColor', params.bgColor);
         if (params.useCenterImage !== DEFAULTS.useCenterImage) sp.set('useCenterImage', params.useCenterImage ? '1' : '0');
+        if (params.showLabels !== DEFAULTS.showLabels) sp.set('showLabels', params.showLabels ? '1' : '0');
         if (params.globalYaw !== DEFAULTS.globalYaw) sp.set('globalYaw', String(Math.round(params.globalYaw)));
         if (params.globalRoll !== DEFAULTS.globalRoll) sp.set('globalRoll', String(Math.round(params.globalRoll)));
         if (params.globalPitch !== DEFAULTS.globalPitch) sp.set('globalPitch', String(Math.round(params.globalPitch)));
