@@ -120,9 +120,8 @@
         const sphereScale = params.sphereRadius / SPHERE_BASE_RADIUS;
         sphere.scale.setScalar(sphereScale);
 
-        // apply global rotation (degrees -> radians) to point clouds only
-        const gYaw = (params.globalYaw || 0) * DEG2RAD;
-        pcGroup.rotation.set(0, gYaw, 0);
+        // Global rotation now applies per point cloud about its own center (handled below)
+        pcGroup.rotation.set(0, 0, 0);
 
         for (let k = 0; k < COUNT; k++) {
           const angleVertex = (k / COUNT) * Math.PI * 2 - Math.PI / 2;
@@ -138,8 +137,9 @@
           const m = models[k];
           if (m && m.mesh) {
             m.mesh.position.copy(polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION));
-            // Absolute yaw (deg) around Y axis; default already points along tangent
-            const yaw = (params.plyRotation[k] || 0) * DEG2RAD;
+            // Rotate each point cloud around its own center: per-PLY yaw + globalYaw
+            const yawDeg = (params.plyRotation[k] || 0) + (params.globalYaw || 0);
+            const yaw = yawDeg * DEG2RAD;
             m.mesh.rotation.set(0, yaw, 0);
             if (m.baseScale) {
               m.mesh.scale.setScalar(m.baseScale * params.pointScale);
@@ -201,8 +201,9 @@
 
             const base = polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION);
             points.position.copy(base);
-            // Absolute yaw (deg) around Y axis; default already points along tangent
-            const yaw = (params.plyRotation[index] || 0) * DEG2RAD;
+            // Absolute yaw per PLY + global yaw (rotate around own center without moving)
+            const yawDeg = (params.plyRotation[index] || 0) + (params.globalYaw || 0);
+            const yaw = yawDeg * DEG2RAD;
             points.rotation.set(0, yaw, 0);
 
             pcGroup.add(points);
