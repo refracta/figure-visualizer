@@ -946,19 +946,22 @@
         if (params.globalUD !== DEFAULTS.globalUD) sp.set('globalUD', String(round(params.globalUD)));
         if (params.globalLR !== DEFAULTS.globalLR) sp.set('globalLR', String(round(params.globalLR)));
         if (params.dBase !== DEFAULTS.dBase) sp.set('dBase', String(round(params.dBase)));
-        // Arrays
-        if (!arraysEqual(params.plyYaw, DEFAULT_ARR.yaw)) sp.set('yaw', toCSVInt(params.plyYaw));
-        if (!arraysEqual(params.plyRoll, DEFAULT_ARR.roll)) sp.set('roll', toCSVInt(params.plyRoll));
-        if (!arraysEqual(params.plyPitch, DEFAULT_ARR.pitch)) sp.set('pitch', toCSVInt(params.plyPitch));
-        if (!arraysEqual(params.plyH, DEFAULT_ARR.h)) sp.set('h', toCSVInt(params.plyH));
-        // Always include D/UD/LR arrays, even if equal to defaults
-        sp.set('d', toCSVFloat(params.plyD || DEFAULT_ARR.d, 2));
-        sp.set('ud', toCSVFloat(params.plyUD || DEFAULT_ARR.ud, 2));
-        sp.set('lr', toCSVFloat(params.plyLR || DEFAULT_ARR.lr, 2));
-        if (!arraysEqual(params.plyImgAlpha || DEFAULT_ARR.img, DEFAULT_ARR.img)) sp.set('img', toCSVFloat(params.plyImgAlpha || DEFAULT_ARR.img, 2));
+        // Arrays (manual to avoid URL encoding of delimiter)
+        const arrSegments = [];
+        if (!arraysEqual(params.plyYaw, DEFAULT_ARR.yaw)) arrSegments.push('yaw=' + toCSVInt(params.plyYaw));
+        if (!arraysEqual(params.plyRoll, DEFAULT_ARR.roll)) arrSegments.push('roll=' + toCSVInt(params.plyRoll));
+        if (!arraysEqual(params.plyPitch, DEFAULT_ARR.pitch)) arrSegments.push('pitch=' + toCSVInt(params.plyPitch));
+        if (!arraysEqual(params.plyH, DEFAULT_ARR.h)) arrSegments.push('h=' + toCSVInt(params.plyH));
+        // Always include D/UD/LR arrays
+        arrSegments.push('d=' + toCSVFloat(params.plyD || DEFAULT_ARR.d, 2));
+        arrSegments.push('ud=' + toCSVFloat(params.plyUD || DEFAULT_ARR.ud, 2));
+        arrSegments.push('lr=' + toCSVFloat(params.plyLR || DEFAULT_ARR.lr, 2));
+        if (!arraysEqual(params.plyImgAlpha || DEFAULT_ARR.img, DEFAULT_ARR.img)) arrSegments.push('img=' + toCSVFloat(params.plyImgAlpha || DEFAULT_ARR.img, 2));
         // Replace URL without reloading
         const base = location.origin + location.pathname;
-        const query = sp.toString();
+        let query = sp.toString();
+        const arrQuery = arrSegments.join('&');
+        if (arrQuery) query = query ? `${query}&${arrQuery}` : arrQuery;
         const hash = location.hash || '';
         const url = query ? `${base}?${query}${hash}` : `${base}${hash}`;
         history.replaceState(null, '', url);
