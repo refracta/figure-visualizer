@@ -80,7 +80,7 @@
       const COUNT = 5;
       const PLY_OFFSET = 0.28; // how much further the PLY sits behind the image (away from center)
       const ELEVATION = 0.0; // y-position for both images and PLYs
-      const DEFAULTS = { sphereRadius: SPHERE_BASE_RADIUS, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0 };
+      const DEFAULTS = { sphereRadius: SPHERE_BASE_RADIUS, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0 };
       const params = { ...DEFAULTS };
 
       const group = new THREE.Group();
@@ -122,6 +122,9 @@
           if (m && m.mesh) {
             m.mesh.position.copy(polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION));
             m.mesh.lookAt(0, ELEVATION, 0);
+            if (m.baseScale) {
+              m.mesh.scale.setScalar(m.baseScale * params.pointScale);
+            }
             if (m.mesh.material && 'size' in m.mesh.material) {
               m.mesh.material.size = params.pointSize;
               m.mesh.material.needsUpdate = true;
@@ -170,11 +173,12 @@
             // Fit model to a target radius for consistency
             geom.computeBoundingSphere();
             const bs = geom.boundingSphere;
+            let baseScale = 1.0;
             if (bs && bs.radius > 0) {
               const target = 0.6; // target bounding sphere radius in world units
-              const s = target / bs.radius;
-              points.scale.setScalar(s);
+              baseScale = target / bs.radius;
             }
+            points.scale.setScalar(baseScale * params.pointScale);
 
             const base = polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION);
             points.position.copy(base);
@@ -183,7 +187,7 @@
             points.lookAt(0, ELEVATION, 0);
 
             group.add(points);
-            models[index] = { mesh: points };
+            models[index] = { mesh: points, baseScale };
           },
           undefined,
           (err) => {
@@ -235,6 +239,11 @@
           <input id="pointSize" type="range" min="1" max="10" step="0.1" value="${DEFAULTS.pointSize}">
           <div class="val" id="pointSizeVal">${DEFAULTS.pointSize.toFixed(1)} px</div>
         </div>
+        <div class="row">
+          <label for="pointScale">Point Cloud Scale</label>
+          <input id="pointScale" type="range" min="0.2" max="3.0" step="0.01" value="${DEFAULTS.pointScale}">
+          <div class="val" id="pointScaleVal">${DEFAULTS.pointScale.toFixed(2)}×</div>
+        </div>
       `;
       document.body.appendChild(ui);
 
@@ -243,7 +252,13 @@
         const val = document.getElementById(id + 'Val');
         el.addEventListener('input', () => {
           params[key] = parseFloat(el.value);
-          val.textContent = params[key].toFixed(2);
+          if (key === 'pointSize') {
+            val.textContent = params[key].toFixed(1) + ' px';
+          } else if (key === 'pointScale') {
+            val.textContent = params[key].toFixed(2) + '×';
+          } else {
+            val.textContent = params[key].toFixed(2);
+          }
           updateLayout();
         });
       }
@@ -251,6 +266,7 @@
       bindSlider('ringRadius', 'ringRadius');
       bindSlider('spriteHeight', 'spriteHeight');
       bindSlider('pointSize', 'pointSize');
+      bindSlider('pointScale', 'pointScale');
     </script>
   </body>
  </html>
