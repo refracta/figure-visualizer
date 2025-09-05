@@ -121,7 +121,9 @@
           const m = models[k];
           if (m && m.mesh) {
             m.mesh.position.copy(polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION));
-            m.mesh.lookAt(0, ELEVATION, 0);
+            // Orient along edge tangent direction (CCTV capture direction)
+            const tangent = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle));
+            m.mesh.lookAt(m.mesh.position.clone().sub(tangent));
             if (m.baseScale) {
               m.mesh.scale.setScalar(m.baseScale * params.pointScale);
             }
@@ -182,9 +184,9 @@
 
             const base = polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION);
             points.position.copy(base);
-
-            // Face toward center (orientation not critical for points)
-            points.lookAt(0, ELEVATION, 0);
+            // Orient along edge tangent direction (CCTV capture direction)
+            const tangent = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle));
+            points.lookAt(points.position.clone().sub(tangent));
 
             group.add(points);
             models[index] = { mesh: points, baseScale };
