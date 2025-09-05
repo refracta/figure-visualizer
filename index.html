@@ -218,6 +218,14 @@
         return pos;
       }
 
+      function imageAlphaFor(index) {
+        const per = (params.plyImgAlpha && params.plyImgAlpha[index] != null) ? params.plyImgAlpha[index] : 1;
+        const g = (params.imgAlpha == null ? 1 : params.imgAlpha);
+        let a = g * per;
+        if (!isFinite(a)) a = 1;
+        return Math.max(0, Math.min(1, a));
+      }
+
       function updateCenter() {
         const size = params.centerSize;
         // Toggle visibility
@@ -311,6 +319,9 @@
             // Face toward center so local X aligns with tangential direction
             plane.lookAt(0, ELEVATION, 0);
             plane.scale.set(params.spriteHeight * aspect, params.spriteHeight, 1);
+            // initial opacity
+            plane.material.opacity = imageAlphaFor(index);
+            plane.material.needsUpdate = true;
             group.add(plane);
             // Add label sprite
             const lblTex = makeNumberTexture(i);
@@ -325,6 +336,8 @@
             plane.add(label);
 
             planes[index] = { mesh: plane, aspect, label };
+            // Apply layout once plane exists (ensures opacity/labels correct if URL provided)
+            updateLayout();
           },
           undefined,
           (err) => {
@@ -365,6 +378,8 @@
 
             pcGroup.add(points);
             models[index] = { mesh: points, baseScale };
+            // Ensure layout gets applied after model loads (e.g., D/UD/LR from URL)
+            updateLayout();
           },
           undefined,
           (err) => {
