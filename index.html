@@ -101,6 +101,46 @@
       params.plyRoll = Array.from({ length: COUNT }, () => 0);
       params.plyH = Array.from({ length: COUNT }, () => 0);
 
+      const DEFAULT_ARR = {
+        yaw: DEFAULT_PLY_YAW_DEG.map(norm360),
+        pitch: Array.from({ length: COUNT }, () => 0),
+        roll: Array.from({ length: COUNT }, () => 0),
+        h: Array.from({ length: COUNT }, () => 0),
+      };
+
+      // ---- URL query parsing ----
+      function parseArrayCSV(str, len, normFn) {
+        const parts = String(str).split(',');
+        const out = new Array(len);
+        for (let i = 0; i < len; i++) {
+          const v = parseFloat(parts[i]);
+          out[i] = isNaN(v) ? 0 : (normFn ? normFn(v) : v);
+        }
+        return out;
+      }
+      function loadParamsFromURL() {
+        const q = new URLSearchParams(window.location.search);
+        const num = (k) => q.has(k) ? parseFloat(q.get(k)) : undefined;
+        const bool = (k) => q.has(k) ? (/^(1|true|on)$/i.test(q.get(k))) : undefined;
+        const str = (k) => q.get(k);
+        const vCenterSize = num('centerSize'); if (!isNaN(vCenterSize)) params.centerSize = vCenterSize;
+        const vRing = num('ringRadius'); if (!isNaN(vRing)) params.ringRadius = vRing;
+        const vSprite = num('spriteHeight'); if (!isNaN(vSprite)) params.spriteHeight = vSprite;
+        const vPtSize = num('pointSize'); if (!isNaN(vPtSize)) params.pointSize = vPtSize;
+        const vPtScale = num('pointScale'); if (!isNaN(vPtScale)) params.pointScale = vPtScale;
+        const vBG = str('bgColor'); if (vBG) params.bgColor = vBG;
+        const vCenterImg = bool('useCenterImage'); if (typeof vCenterImg === 'boolean') params.useCenterImage = vCenterImg;
+        const vGY = num('globalYaw'); if (!isNaN(vGY)) params.globalYaw = norm360(vGY);
+        const vGR = num('globalRoll'); if (!isNaN(vGR)) params.globalRoll = norm360(vGR);
+        const vGP = num('globalPitch'); if (!isNaN(vGP)) params.globalPitch = norm360(vGP);
+        const vGH = num('globalH'); if (!isNaN(vGH)) params.globalH = norm360(vGH);
+        if (q.has('yaw')) params.plyYaw = parseArrayCSV(q.get('yaw'), COUNT, (d) => norm360(d));
+        if (q.has('roll')) params.plyRoll = parseArrayCSV(q.get('roll'), COUNT, (d) => norm360(d));
+        if (q.has('pitch')) params.plyPitch = parseArrayCSV(q.get('pitch'), COUNT, (d) => norm360(d));
+        if (q.has('h')) params.plyH = parseArrayCSV(q.get('h'), COUNT, (d) => norm360(d));
+      }
+      loadParamsFromURL();
+
       const group = new THREE.Group();
       scene.add(group);
       const pcGroup = new THREE.Group(); // holds only the point clouds
@@ -293,18 +333,18 @@
           <div class="title">Display</div>
           <div class="row">
             <label for="bgColor">Background</label>
-            <input id="bgColor" type="color" value="${DEFAULTS.bgColor}">
-            <div class="val" id="bgColorVal">${DEFAULTS.bgColor.toUpperCase()}</div>
+            <input id="bgColor" type="color" value="${params.bgColor}">
+            <div class="val" id="bgColorVal">${params.bgColor.toUpperCase()}</div>
           </div>
           <div class="row">
             <label for="useCenterImage">Center Image</label>
-            <input id="useCenterImage" type="checkbox" ${DEFAULTS.useCenterImage ? 'checked' : ''}>
-            <div class="val" id="useCenterImageVal">${DEFAULTS.useCenterImage ? 'ON' : 'OFF'}</div>
+            <input id="useCenterImage" type="checkbox" ${params.useCenterImage ? 'checked' : ''}>
+            <div class="val" id="useCenterImageVal">${params.useCenterImage ? 'ON' : 'OFF'}</div>
           </div>
           <div class="row">
             <label for="centerSize">Center Size</label>
-            <input id="centerSize" type="range" min="0.1" max="3.0" step="0.01" value="${DEFAULTS.centerSize}">
-            <div class="val" id="centerSizeVal">${DEFAULTS.centerSize.toFixed(2)}</div>
+            <input id="centerSize" type="range" min="0.1" max="3.0" step="0.01" value="${params.centerSize}">
+            <div class="val" id="centerSizeVal">${params.centerSize.toFixed(2)}</div>
           </div>
         </div>
 
@@ -312,13 +352,13 @@
           <div class="title">Layout</div>
           <div class="row">
             <label for="ringRadius">Image Distance</label>
-            <input id="ringRadius" type="range" min="1.0" max="6.0" step="0.01" value="${DEFAULTS.ringRadius}">
-            <div class="val" id="ringRadiusVal">${DEFAULTS.ringRadius.toFixed(2)}</div>
+            <input id="ringRadius" type="range" min="1.0" max="6.0" step="0.01" value="${params.ringRadius}">
+            <div class="val" id="ringRadiusVal">${params.ringRadius.toFixed(2)}</div>
           </div>
           <div class="row">
             <label for="spriteHeight">Image Size</label>
-            <input id="spriteHeight" type="range" min="0.2" max="2.5" step="0.01" value="${DEFAULTS.spriteHeight}">
-            <div class="val" id="spriteHeightVal">${DEFAULTS.spriteHeight.toFixed(2)}</div>
+            <input id="spriteHeight" type="range" min="0.2" max="2.5" step="0.01" value="${params.spriteHeight}">
+            <div class="val" id="spriteHeightVal">${params.spriteHeight.toFixed(2)}</div>
           </div>
         </div>
 
@@ -326,13 +366,13 @@
           <div class="title">Point Cloud</div>
           <div class="row">
             <label for="pointSize">Point Size</label>
-            <input id="pointSize" type="range" min="1" max="10" step="0.1" value="${DEFAULTS.pointSize}">
-            <div class="val" id="pointSizeVal">${DEFAULTS.pointSize.toFixed(1)} px</div>
+            <input id="pointSize" type="range" min="1" max="10" step="0.1" value="${params.pointSize}">
+            <div class="val" id="pointSizeVal">${params.pointSize.toFixed(1)} px</div>
           </div>
           <div class="row">
             <label for="pointScale">Point Cloud Scale</label>
-            <input id="pointScale" type="range" min="0.2" max="10.0" step="0.01" value="${DEFAULTS.pointScale}">
-            <div class="val" id="pointScaleVal">${DEFAULTS.pointScale.toFixed(2)}×</div>
+            <input id="pointScale" type="range" min="0.2" max="10.0" step="0.01" value="${params.pointScale}">
+            <div class="val" id="pointScaleVal">${params.pointScale.toFixed(2)}×</div>
           </div>
         </div>
 
@@ -340,23 +380,23 @@
           <div class="title">Rotation (Global)</div>
           <div class="row">
             <label for="globalYaw">Global Yaw</label>
-            <input id="globalYaw" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalYaw}">
-            <div class="val" id="globalYawVal">${DEFAULTS.globalYaw.toFixed(0)}°</div>
+            <input id="globalYaw" type="range" min="0" max="360" step="1" value="${params.globalYaw}">
+            <div class="val" id="globalYawVal">${params.globalYaw.toFixed(0)}°</div>
           </div>
           <div class="row">
             <label for="globalRoll">Global Roll</label>
-            <input id="globalRoll" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalRoll}">
-            <div class="val" id="globalRollVal">${DEFAULTS.globalRoll.toFixed(0)}°</div>
+            <input id="globalRoll" type="range" min="0" max="360" step="1" value="${params.globalRoll}">
+            <div class="val" id="globalRollVal">${params.globalRoll.toFixed(0)}°</div>
           </div>
           <div class="row">
             <label for="globalPitch">Global Pitch</label>
-            <input id="globalPitch" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalPitch}">
-            <div class="val" id="globalPitchVal">${DEFAULTS.globalPitch.toFixed(0)}°</div>
+            <input id="globalPitch" type="range" min="0" max="360" step="1" value="${params.globalPitch}">
+            <div class="val" id="globalPitchVal">${params.globalPitch.toFixed(0)}°</div>
           </div>
           <div class="row">
             <label for="globalH">Global H-Line</label>
-            <input id="globalH" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalH}">
-            <div class="val" id="globalHVal">${DEFAULTS.globalH.toFixed(0)}°</div>
+            <input id="globalH" type="range" min="0" max="360" step="1" value="${params.globalH}">
+            <div class="val" id="globalHVal">${params.globalH.toFixed(0)}°</div>
           </div>
         </div>
 
@@ -364,28 +404,28 @@
           <div class="title">Yaw (Per PLY)</div>
           <div class="row">
             <label for="plyYaw1">PLY 1 Yaw</label>
-            <input id="plyYaw1" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_YAW_DEG[0].toFixed(0)}">
-            <div class="val" id="plyYaw1Val">${DEFAULT_PLY_YAW_DEG[0].toFixed(0)}°</div>
+            <input id="plyYaw1" type="range" min="0" max="360" step="1" value="${params.plyYaw[0].toFixed(0)}">
+            <div class="val" id="plyYaw1Val">${params.plyYaw[0].toFixed(0)}°</div>
           </div>
           <div class="row">
             <label for="plyYaw2">PLY 2 Yaw</label>
-            <input id="plyYaw2" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_YAW_DEG[1].toFixed(0)}">
-            <div class="val" id="plyYaw2Val">${DEFAULT_PLY_YAW_DEG[1].toFixed(0)}°</div>
+            <input id="plyYaw2" type="range" min="0" max="360" step="1" value="${params.plyYaw[1].toFixed(0)}">
+            <div class="val" id="plyYaw2Val">${params.plyYaw[1].toFixed(0)}°</div>
           </div>
           <div class="row">
             <label for="plyYaw3">PLY 3 Yaw</label>
-            <input id="plyYaw3" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_YAW_DEG[2].toFixed(0)}">
-            <div class="val" id="plyYaw3Val">${DEFAULT_PLY_YAW_DEG[2].toFixed(0)}°</div>
+            <input id="plyYaw3" type="range" min="0" max="360" step="1" value="${params.plyYaw[2].toFixed(0)}">
+            <div class="val" id="plyYaw3Val">${params.plyYaw[2].toFixed(0)}°</div>
           </div>
           <div class="row">
             <label for="plyYaw4">PLY 4 Yaw</label>
-            <input id="plyYaw4" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_YAW_DEG[3].toFixed(0)}">
-            <div class="val" id="plyYaw4Val">${DEFAULT_PLY_YAW_DEG[3].toFixed(0)}°</div>
+            <input id="plyYaw4" type="range" min="0" max="360" step="1" value="${params.plyYaw[3].toFixed(0)}">
+            <div class="val" id="plyYaw4Val">${params.plyYaw[3].toFixed(0)}°</div>
           </div>
           <div class="row">
             <label for="plyYaw5">PLY 5 Yaw</label>
-            <input id="plyYaw5" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_YAW_DEG[4].toFixed(0)}">
-            <div class="val" id="plyYaw5Val">${DEFAULT_PLY_YAW_DEG[4].toFixed(0)}°</div>
+            <input id="plyYaw5" type="range" min="0" max="360" step="1" value="${params.plyYaw[4].toFixed(0)}">
+            <div class="val" id="plyYaw5Val">${params.plyYaw[4].toFixed(0)}°</div>
           </div>
         </div>
 
@@ -505,6 +545,7 @@
             val.textContent = params[key].toFixed(2);
           }
           updateLayout();
+          syncURL();
         });
       }
       function bindCheckbox(id, key) {
@@ -514,6 +555,7 @@
           params[key] = !!el.checked;
           val.textContent = params[key] ? 'ON' : 'OFF';
           updateLayout();
+          syncURL();
         };
         el.addEventListener('change', update);
         update();
@@ -527,6 +569,7 @@
           arr[idx] = deg;
           val.textContent = `${deg.toFixed(0)}°`;
           updateLayout();
+          syncURL();
         });
       }
       function bindColor(id, key) {
@@ -536,6 +579,7 @@
           params[key] = el.value;
           val.textContent = params[key].toUpperCase();
           updateBackground();
+          syncURL();
         });
       }
       bindCheckbox('useCenterImage', 'useCenterImage');
@@ -571,6 +615,46 @@
       bindColor('bgColor', 'bgColor');
       // initialize background from default
       updateBackground();
+
+      // ---- URL sync (serialize only when deviating from defaults) ----
+      function arraysEqual(a, b) {
+        if (!a || !b || a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+        return true;
+      }
+      function round(n, d = 2) {
+        const p = Math.pow(10, d);
+        return Math.round(n * p) / p;
+      }
+      function toCSV(arr) {
+        return arr.map(v => Math.round(v)).join(',');
+      }
+      function syncURL() {
+        const sp = new URLSearchParams();
+        // Scalars
+        if (params.centerSize !== DEFAULTS.centerSize) sp.set('centerSize', String(round(params.centerSize)));
+        if (params.ringRadius !== DEFAULTS.ringRadius) sp.set('ringRadius', String(round(params.ringRadius)));
+        if (params.spriteHeight !== DEFAULTS.spriteHeight) sp.set('spriteHeight', String(round(params.spriteHeight)));
+        if (params.pointSize !== DEFAULTS.pointSize) sp.set('pointSize', String(round(params.pointSize, 1)));
+        if (params.pointScale !== DEFAULTS.pointScale) sp.set('pointScale', String(round(params.pointScale)));
+        if ((params.bgColor || '').toLowerCase() !== (DEFAULTS.bgColor || '').toLowerCase()) sp.set('bgColor', params.bgColor);
+        if (params.useCenterImage !== DEFAULTS.useCenterImage) sp.set('useCenterImage', params.useCenterImage ? '1' : '0');
+        if (params.globalYaw !== DEFAULTS.globalYaw) sp.set('globalYaw', String(Math.round(params.globalYaw)));
+        if (params.globalRoll !== DEFAULTS.globalRoll) sp.set('globalRoll', String(Math.round(params.globalRoll)));
+        if (params.globalPitch !== DEFAULTS.globalPitch) sp.set('globalPitch', String(Math.round(params.globalPitch)));
+        if (params.globalH !== DEFAULTS.globalH) sp.set('globalH', String(Math.round(params.globalH)));
+        // Arrays
+        if (!arraysEqual(params.plyYaw, DEFAULT_ARR.yaw)) sp.set('yaw', toCSV(params.plyYaw));
+        if (!arraysEqual(params.plyRoll, DEFAULT_ARR.roll)) sp.set('roll', toCSV(params.plyRoll));
+        if (!arraysEqual(params.plyPitch, DEFAULT_ARR.pitch)) sp.set('pitch', toCSV(params.plyPitch));
+        if (!arraysEqual(params.plyH, DEFAULT_ARR.h)) sp.set('h', toCSV(params.plyH));
+        // Replace URL without reloading
+        const base = location.origin + location.pathname;
+        const query = sp.toString();
+        const hash = location.hash || '';
+        const url = query ? `${base}?${query}${hash}` : `${base}${hash}`;
+        history.replaceState(null, '', url);
+      }
     </script>
   </body>
  </html>
