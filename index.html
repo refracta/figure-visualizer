@@ -82,8 +82,14 @@
       const ELEVATION = 0.0; // y-position for both images and PLYs
       const DEFAULTS = { sphereRadius: SPHERE_BASE_RADIUS, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff' };
       const params = { ...DEFAULTS };
-      // Per-PLY yaw rotation offsets (degrees)
-      params.plyRotation = [0, 0, 0, 0, 0];
+      // Default yaw per PLY (deg) to face edge tangent
+      const DEFAULT_PLY_ROT_DEG = Array.from({ length: COUNT }, (_, k) => {
+        const angleVertex = (k / COUNT) * Math.PI * 2 - Math.PI / 2;
+        const angle = angleVertex + Math.PI / COUNT; // edge midpoint
+        const yaw = -angle; // atan2(-sin(angle), cos(angle)) = -angle
+        return yaw * RAD2DEG;
+      });
+      params.plyRotation = DEFAULT_PLY_ROT_DEG.slice();
 
       const group = new THREE.Group();
       scene.add(group);
@@ -96,6 +102,7 @@
       const planes = new Array(COUNT); // { mesh, aspect }
       const models = new Array(COUNT); // { mesh }
       const DEG2RAD = Math.PI / 180;
+      const RAD2DEG = 180 / Math.PI;
 
       function polarPosition(radius, angle, y = 0) {
         return new THREE.Vector3(
@@ -124,11 +131,9 @@
           const m = models[k];
           if (m && m.mesh) {
             m.mesh.position.copy(polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION));
-            // Orient along edge tangent direction, then apply per-PLY yaw (deg)
-            const tangent = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle));
-            m.mesh.lookAt(m.mesh.position.clone().sub(tangent));
+            // Absolute yaw (deg) around Y axis; default already points along tangent
             const yaw = (params.plyRotation[k] || 0) * DEG2RAD;
-            m.mesh.rotateY(yaw);
+            m.mesh.rotation.set(0, yaw, 0);
             if (m.baseScale) {
               m.mesh.scale.setScalar(m.baseScale * params.pointScale);
             }
@@ -189,11 +194,9 @@
 
             const base = polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION);
             points.position.copy(base);
-            // Orient along edge tangent direction, then apply per-PLY yaw (deg)
-            const tangent = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle));
-            points.lookAt(points.position.clone().sub(tangent));
+            // Absolute yaw (deg) around Y axis; default already points along tangent
             const yaw = (params.plyRotation[index] || 0) * DEG2RAD;
-            points.rotateY(yaw);
+            points.rotation.set(0, yaw, 0);
 
             group.add(points);
             models[index] = { mesh: points, baseScale };
@@ -260,28 +263,28 @@
         </div>
         <div class="row">
           <label for="plyRot1">PLY 1 Rot</label>
-          <input id="plyRot1" type="range" min="-180" max="180" step="1" value="${(0).toFixed(0)}">
-          <div class="val" id="plyRot1Val">${(0).toFixed(0)}°</div>
+          <input id="plyRot1" type="range" min="-180" max="180" step="1" value="${DEFAULT_PLY_ROT_DEG[0].toFixed(0)}">
+          <div class="val" id="plyRot1Val">${DEFAULT_PLY_ROT_DEG[0].toFixed(0)}°</div>
         </div>
         <div class="row">
           <label for="plyRot2">PLY 2 Rot</label>
-          <input id="plyRot2" type="range" min="-180" max="180" step="1" value="${(0).toFixed(0)}">
-          <div class="val" id="plyRot2Val">${(0).toFixed(0)}°</div>
+          <input id="plyRot2" type="range" min="-180" max="180" step="1" value="${DEFAULT_PLY_ROT_DEG[1].toFixed(0)}">
+          <div class="val" id="plyRot2Val">${DEFAULT_PLY_ROT_DEG[1].toFixed(0)}°</div>
         </div>
         <div class="row">
           <label for="plyRot3">PLY 3 Rot</label>
-          <input id="plyRot3" type="range" min="-180" max="180" step="1" value="${(0).toFixed(0)}">
-          <div class="val" id="plyRot3Val">${(0).toFixed(0)}°</div>
+          <input id="plyRot3" type="range" min="-180" max="180" step="1" value="${DEFAULT_PLY_ROT_DEG[2].toFixed(0)}">
+          <div class="val" id="plyRot3Val">${DEFAULT_PLY_ROT_DEG[2].toFixed(0)}°</div>
         </div>
         <div class="row">
           <label for="plyRot4">PLY 4 Rot</label>
-          <input id="plyRot4" type="range" min="-180" max="180" step="1" value="${(0).toFixed(0)}">
-          <div class="val" id="plyRot4Val">${(0).toFixed(0)}°</div>
+          <input id="plyRot4" type="range" min="-180" max="180" step="1" value="${DEFAULT_PLY_ROT_DEG[3].toFixed(0)}">
+          <div class="val" id="plyRot4Val">${DEFAULT_PLY_ROT_DEG[3].toFixed(0)}°</div>
         </div>
         <div class="row">
           <label for="plyRot5">PLY 5 Rot</label>
-          <input id="plyRot5" type="range" min="-180" max="180" step="1" value="${(0).toFixed(0)}">
-          <div class="val" id="plyRot5Val">${(0).toFixed(0)}°</div>
+          <input id="plyRot5" type="range" min="-180" max="180" step="1" value="${DEFAULT_PLY_ROT_DEG[4].toFixed(0)}">
+          <div class="val" id="plyRot5Val">${DEFAULT_PLY_ROT_DEG[4].toFixed(0)}°</div>
         </div>
       `;
       document.body.appendChild(ui);
