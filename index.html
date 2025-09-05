@@ -80,7 +80,7 @@
       const COUNT = 5;
       const PLY_OFFSET = 0.28; // how much further the PLY sits behind the image (away from center)
       const ELEVATION = 0.0; // y-position for both images and PLYs
-      const DEFAULTS = { sphereRadius: SPHERE_BASE_RADIUS, ringRadius: 2.8, spriteHeight: 2.0 };
+      const DEFAULTS = { sphereRadius: SPHERE_BASE_RADIUS, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0 };
       const params = { ...DEFAULTS };
 
       const group = new THREE.Group();
@@ -122,6 +122,10 @@
           if (m && m.mesh) {
             m.mesh.position.copy(polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION));
             m.mesh.lookAt(0, ELEVATION, 0);
+            if (m.mesh.material && 'size' in m.mesh.material) {
+              m.mesh.material.size = params.pointSize;
+              m.mesh.material.needsUpdate = true;
+            }
           }
         }
       }
@@ -159,12 +163,9 @@
         plyLoader.load(
           plyPath,
           (geom) => {
-            // Ensure normals and vertex colors are used
-            if (!geom.attributes.normal) {
-              geom.computeVertexNormals();
-            }
-            const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.0 });
-            const mesh = new THREE.Mesh(geom, mat);
+            // Points with per-vertex color; no normals needed
+            const mat = new THREE.PointsMaterial({ vertexColors: true, size: params.pointSize, sizeAttenuation: false });
+            const points = new THREE.Points(geom, mat);
 
             // Fit model to a target radius for consistency
             geom.computeBoundingSphere();
@@ -172,17 +173,17 @@
             if (bs && bs.radius > 0) {
               const target = 0.6; // target bounding sphere radius in world units
               const s = target / bs.radius;
-              mesh.scale.setScalar(s);
+              points.scale.setScalar(s);
             }
 
             const base = polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION);
-            mesh.position.copy(base);
+            points.position.copy(base);
 
-            // Face toward center
-            mesh.lookAt(0, ELEVATION, 0);
+            // Face toward center (orientation not critical for points)
+            points.lookAt(0, ELEVATION, 0);
 
-            group.add(mesh);
-            models[index] = { mesh };
+            group.add(points);
+            models[index] = { mesh: points };
           },
           undefined,
           (err) => {
@@ -229,6 +230,11 @@
           <input id="spriteHeight" type="range" min="0.2" max="2.5" step="0.01" value="${DEFAULTS.spriteHeight}">
           <div class="val" id="spriteHeightVal">${DEFAULTS.spriteHeight.toFixed(2)}</div>
         </div>
+        <div class="row">
+          <label for="pointSize">Point Size</label>
+          <input id="pointSize" type="range" min="1" max="10" step="0.1" value="${DEFAULTS.pointSize}">
+          <div class="val" id="pointSizeVal">${DEFAULTS.pointSize.toFixed(1)} px</div>
+        </div>
       `;
       document.body.appendChild(ui);
 
@@ -244,6 +250,7 @@
       bindSlider('sphereRadius', 'sphereRadius');
       bindSlider('ringRadius', 'ringRadius');
       bindSlider('spriteHeight', 'spriteHeight');
+      bindSlider('pointSize', 'pointSize');
     </script>
   </body>
  </html>
