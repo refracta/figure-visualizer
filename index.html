@@ -80,7 +80,7 @@
       const COUNT = 5;
       const PLY_OFFSET = 0.28; // how much further the PLY sits behind the image (away from center)
       const ELEVATION = 0.0; // y-position for both images and PLYs
-      const DEFAULTS = { sphereRadius: SPHERE_BASE_RADIUS, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0 };
+      const DEFAULTS = { sphereRadius: SPHERE_BASE_RADIUS, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff' };
       const params = { ...DEFAULTS };
 
       const group = new THREE.Group();
@@ -220,6 +220,11 @@
       ui.id = 'ui';
       ui.innerHTML = `
         <div class="row">
+          <label for="bgColor">Background</label>
+          <input id="bgColor" type="color" value="${DEFAULTS.bgColor}">
+          <div class="val" id="bgColorVal">${DEFAULTS.bgColor.toUpperCase()}</div>
+        </div>
+        <div class="row">
           <label for="sphereRadius">Sphere Radius</label>
           <input id="sphereRadius" type="range" min="0.1" max="1.5" step="0.01" value="${DEFAULTS.sphereRadius}">
           <div class="val" id="sphereRadiusVal">${DEFAULTS.sphereRadius.toFixed(2)}</div>
@@ -247,6 +252,18 @@
       `;
       document.body.appendChild(ui);
 
+      function updateBackground() {
+        // Update both scene and page backgrounds
+        const c = params.bgColor;
+        if (scene.background && scene.background.isColor) {
+          scene.background.set(c);
+        } else {
+          scene.background = new THREE.Color(c);
+        }
+        document.body.style.background = c;
+        document.documentElement.style.background = c;
+      }
+
       function bindSlider(id, key) {
         const el = document.getElementById(id);
         const val = document.getElementById(id + 'Val');
@@ -262,11 +279,23 @@
           updateLayout();
         });
       }
+      function bindColor(id, key) {
+        const el = document.getElementById(id);
+        const val = document.getElementById(id + 'Val');
+        el.addEventListener('input', () => {
+          params[key] = el.value;
+          val.textContent = params[key].toUpperCase();
+          updateBackground();
+        });
+      }
       bindSlider('sphereRadius', 'sphereRadius');
       bindSlider('ringRadius', 'ringRadius');
       bindSlider('spriteHeight', 'spriteHeight');
       bindSlider('pointSize', 'pointSize');
       bindSlider('pointScale', 'pointScale');
+      bindColor('bgColor', 'bgColor');
+      // initialize background from default
+      updateBackground();
     </script>
   </body>
  </html>
