@@ -81,11 +81,11 @@
 
       // ----- layout parameters -----
       const COUNT = 5;
-      const PLY_OFFSET = 0.28; // how much further the PLY sits behind the image (away from center)
+      const PLY_OFFSET = 0.28; // default D-LINE length baseline from image to PLY
       const ELEVATION = 0.0; // y-position for both images and PLYs
       const DEG2RAD = Math.PI / 180;
       const RAD2DEG = 180 / Math.PI;
-      const DEFAULTS = { centerSize: 1.25, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff', useCenterImage: true, globalYaw: 0, globalPitch: 0, globalRoll: 0, globalH: 0 };
+      const DEFAULTS = { centerSize: 1.25, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff', useCenterImage: true, globalYaw: 0, globalPitch: 0, globalRoll: 0, globalH: 0, dBase: PLY_OFFSET, globalD: 0, globalUD: 0, globalLR: 0 };
       const params = { ...DEFAULTS };
       // Default yaw per PLY (deg) to face edge tangent, normalized to [0, 360)
       const DEFAULT_PLY_YAW_DEG = Array.from({ length: COUNT }, (_, k) => {
@@ -100,12 +100,18 @@
       params.plyPitch = Array.from({ length: COUNT }, () => 0);
       params.plyRoll = Array.from({ length: COUNT }, () => 0);
       params.plyH = Array.from({ length: COUNT }, () => 0);
+      params.plyD = Array.from({ length: COUNT }, () => 0); // D-LINE per-PLY delta
+      params.plyUD = Array.from({ length: COUNT }, () => 0); // D-PLINE up/down per-PLY
+      params.plyLR = Array.from({ length: COUNT }, () => 0); // D-PLINE left/right per-PLY
 
       const DEFAULT_ARR = {
         yaw: DEFAULT_PLY_YAW_DEG.map(norm360),
         pitch: Array.from({ length: COUNT }, () => 0),
         roll: Array.from({ length: COUNT }, () => 0),
         h: Array.from({ length: COUNT }, () => 0),
+        d: Array.from({ length: COUNT }, () => 0),
+        ud: Array.from({ length: COUNT }, () => 0),
+        lr: Array.from({ length: COUNT }, () => 0),
       };
 
       // ---- URL query parsing ----
@@ -138,6 +144,9 @@
         if (q.has('roll')) params.plyRoll = parseArrayCSV(q.get('roll'), COUNT, (d) => norm360(d));
         if (q.has('pitch')) params.plyPitch = parseArrayCSV(q.get('pitch'), COUNT, (d) => norm360(d));
         if (q.has('h')) params.plyH = parseArrayCSV(q.get('h'), COUNT, (d) => norm360(d));
+        if (q.has('d')) params.plyD = parseArrayCSV(q.get('d'), COUNT);
+        if (q.has('ud')) params.plyUD = parseArrayCSV(q.get('ud'), COUNT);
+        if (q.has('lr')) params.plyLR = parseArrayCSV(q.get('lr'), COUNT);
       }
       loadParamsFromURL();
 
@@ -162,6 +171,18 @@
           y,
           Math.sin(angle) * radius
         );
+      }
+
+      function computePlyPosition(index, angle) {
+        const radialDir = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
+        const tangent = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle));
+        const r = params.ringRadius + params.dBase + (params.globalD || 0) + (params.plyD[index] || 0);
+        const lr = (params.globalLR || 0) + (params.plyLR[index] || 0);
+        const ud = (params.globalUD || 0) + (params.plyUD[index] || 0);
+        const pos = radialDir.clone().multiplyScalar(r)
+          .addScaledVector(tangent, lr)
+          .add(new THREE.Vector3(0, ud, 0));
+        return pos;
       }
 
       function updateCenter() {
@@ -197,7 +218,7 @@
 
           const m = models[k];
           if (m && m.mesh) {
-            m.mesh.position.copy(polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION));
+            m.mesh.position.copy(computePlyPosition(k, angle));
             // Base orientation from Euler (local), then pre-multiply by H-Line (world tangent) axis rotation
             const yawDeg = (params.plyYaw[k] || 0) + (params.globalYaw || 0);
             const pitchDeg = (params.plyPitch[k] || 0) + (params.globalPitch || 0);
@@ -266,8 +287,7 @@
             }
             points.scale.setScalar(baseScale * params.pointScale);
 
-            const base = polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION);
-            points.position.copy(base);
+            points.position.copy(computePlyPosition(index, angle));
             // Apply per-PLY + global rotations (deg) plus H-Line (world tangent) axis rotation
             const yawDeg = (params.plyYaw[index] || 0) + (params.globalYaw || 0);
             const pitchDeg = (params.plyPitch[index] || 0) + (params.globalPitch || 0);
@@ -373,6 +393,109 @@
             <label for="pointScale">Point Cloud Scale</label>
             <input id="pointScale" type="range" min="0.2" max="10.0" step="0.01" value="${params.pointScale}">
             <div class="val" id="pointScaleVal">${params.pointScale.toFixed(2)}×</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="title">D-Line (Image → PLY)</div>
+          <div class="row">
+            <label for="globalD">Global D Length</label>
+            <input id="globalD" type="range" min="-2.0" max="2.0" step="0.01" value="${params.globalD}">
+            <div class="val" id="globalDVal">${params.globalD.toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="dBase">D Base</label>
+            <input id="dBase" type="range" min="0.0" max="2.0" step="0.01" value="${params.dBase}">
+            <div class="val" id="dBaseVal">${params.dBase.toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyD1">PLY 1 D</label>
+            <input id="plyD1" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyD[0]||0).toFixed(2)}">
+            <div class="val" id="plyD1Val">${(params.plyD[0]||0).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyD2">PLY 2 D</label>
+            <input id="plyD2" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyD[1]||0).toFixed(2)}">
+            <div class="val" id="plyD2Val">${(params.plyD[1]||0).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyD3">PLY 3 D</label>
+            <input id="plyD3" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyD[2]||0).toFixed(2)}">
+            <div class="val" id="plyD3Val">${(params.plyD[2]||0).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyD4">PLY 4 D</label>
+            <input id="plyD4" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyD[3]||0).toFixed(2)}">
+            <div class="val" id="plyD4Val">${(params.plyD[3]||0).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyD5">PLY 5 D</label>
+            <input id="plyD5" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyD[4]||0).toFixed(2)}">
+            <div class="val" id="plyD5Val">${(params.plyD[4]||0).toFixed(2)}</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="title">D-Plane Offsets</div>
+          <div class="row">
+            <label for="globalUD">Global Up/Down</label>
+            <input id="globalUD" type="range" min="-2.0" max="2.0" step="0.01" value="${params.globalUD}">
+            <div class="val" id="globalUDVal">${params.globalUD.toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="globalLR">Global Left/Right</label>
+            <input id="globalLR" type="range" min="-2.0" max="2.0" step="0.01" value="${params.globalLR}">
+            <div class="val" id="globalLRVal">${params.globalLR.toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyUD1">PLY 1 Up/Down</label>
+            <input id="plyUD1" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyUD[0]||0).toFixed(2)}">
+            <div class="val" id="plyUD1Val">${(params.plyUD[0]||0).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyLR1">PLY 1 Left/Right</label>
+            <input id="plyLR1" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyLR[0]||0).toFixed(2)}">
+            <div class="val" id="plyLR1Val">${(params.plyLR[0]||0).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyUD2">PLY 2 Up/Down</label>
+            <input id="plyUD2" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyUD[1]||0).toFixed(2)}">
+            <div class="val" id="plyUD2Val">${(params.plyUD[1]||0).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyLR2">PLY 2 Left/Right</label>
+            <input id="plyLR2" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyLR[1]||0).toFixed(2)}">
+            <div class="val" id="plyLR2Val">${(params.plyLR[1]||0).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyUD3">PLY 3 Up/Down</label>
+            <input id="plyUD3" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyUD[2]||0).toFixed(2)}">
+            <div class="val" id="plyUD3Val">${(params.plyUD[2]||0).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyLR3">PLY 3 Left/Right</label>
+            <input id="plyLR3" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyLR[2]||0).toFixed(2)}">
+            <div class="val" id="plyLR3Val">${(params.plyLR[2]||0).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyUD4">PLY 4 Up/Down</label>
+            <input id="plyUD4" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyUD[3]||0).toFixed(2)}">
+            <div class="val" id="plyUD4Val">${(params.plyUD[3]||0).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyLR4">PLY 4 Left/Right</label>
+            <input id="plyLR4" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyLR[3]||0).toFixed(2)}">
+            <div class="val" id="plyLR4Val">${(params.plyLR[3]||0).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyUD5">PLY 5 Up/Down</label>
+            <input id="plyUD5" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyUD[4]||0).toFixed(2)}">
+            <div class="val" id="plyUD5Val">${(params.plyUD[4]||0).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="plyLR5">PLY 5 Left/Right</label>
+            <input id="plyLR5" type="range" min="-1.0" max="1.0" step="0.01" value="${(params.plyLR[4]||0).toFixed(2)}">
+            <div class="val" id="plyLR5Val">${(params.plyLR[4]||0).toFixed(2)}</div>
           </div>
         </div>
 
@@ -541,6 +664,8 @@
             val.textContent = params[key].toFixed(2) + '×';
           } else if (key === 'globalYaw' || key === 'globalPitch' || key === 'globalRoll' || key === 'globalH') {
             val.textContent = params[key].toFixed(0) + '°';
+          } else if (key === 'globalD' || key === 'globalUD' || key === 'globalLR' || key === 'dBase') {
+            val.textContent = params[key].toFixed(2);
           } else {
             val.textContent = params[key].toFixed(2);
           }
@@ -572,6 +697,17 @@
           syncURL();
         });
       }
+      function bindArraySlider(id, arr, idx) {
+        const el = document.getElementById(id);
+        const val = document.getElementById(id + 'Val');
+        el.addEventListener('input', () => {
+          const v = parseFloat(el.value);
+          arr[idx] = isNaN(v) ? 0 : v;
+          val.textContent = `${arr[idx].toFixed(2)}`;
+          updateLayout();
+          syncURL();
+        });
+      }
       function bindColor(id, key) {
         const el = document.getElementById(id);
         const val = document.getElementById(id + 'Val');
@@ -591,22 +727,41 @@
       bindAngleSlider('plyYaw1', params.plyYaw, 0);
       bindAngleSlider('plyPitch1', params.plyPitch, 0);
       bindAngleSlider('plyRoll1', params.plyRoll, 0);
+      bindArraySlider('plyD1', params.plyD, 0);
+      bindArraySlider('plyUD1', params.plyUD, 0);
+      bindArraySlider('plyLR1', params.plyLR, 0);
       bindAngleSlider('plyYaw2', params.plyYaw, 1);
       bindAngleSlider('plyPitch2', params.plyPitch, 1);
       bindAngleSlider('plyRoll2', params.plyRoll, 1);
+      bindArraySlider('plyD2', params.plyD, 1);
+      bindArraySlider('plyUD2', params.plyUD, 1);
+      bindArraySlider('plyLR2', params.plyLR, 1);
       bindAngleSlider('plyYaw3', params.plyYaw, 2);
       bindAngleSlider('plyPitch3', params.plyPitch, 2);
       bindAngleSlider('plyRoll3', params.plyRoll, 2);
+      bindArraySlider('plyD3', params.plyD, 2);
+      bindArraySlider('plyUD3', params.plyUD, 2);
+      bindArraySlider('plyLR3', params.plyLR, 2);
       bindAngleSlider('plyYaw4', params.plyYaw, 3);
       bindAngleSlider('plyPitch4', params.plyPitch, 3);
       bindAngleSlider('plyRoll4', params.plyRoll, 3);
+      bindArraySlider('plyD4', params.plyD, 3);
+      bindArraySlider('plyUD4', params.plyUD, 3);
+      bindArraySlider('plyLR4', params.plyLR, 3);
       bindAngleSlider('plyYaw5', params.plyYaw, 4);
       bindAngleSlider('plyPitch5', params.plyPitch, 4);
       bindAngleSlider('plyRoll5', params.plyRoll, 4);
+      bindArraySlider('plyD5', params.plyD, 4);
+      bindArraySlider('plyUD5', params.plyUD, 4);
+      bindArraySlider('plyLR5', params.plyLR, 4);
       bindSlider('globalYaw', 'globalYaw');
       bindSlider('globalPitch', 'globalPitch');
       bindSlider('globalRoll', 'globalRoll');
       bindSlider('globalH', 'globalH');
+      bindSlider('globalD', 'globalD');
+      bindSlider('globalUD', 'globalUD');
+      bindSlider('globalLR', 'globalLR');
+      bindSlider('dBase', 'dBase');
       bindAngleSlider('plyH1', params.plyH, 0);
       bindAngleSlider('plyH2', params.plyH, 1);
       bindAngleSlider('plyH3', params.plyH, 2);
@@ -643,11 +798,18 @@
         if (params.globalRoll !== DEFAULTS.globalRoll) sp.set('globalRoll', String(Math.round(params.globalRoll)));
         if (params.globalPitch !== DEFAULTS.globalPitch) sp.set('globalPitch', String(Math.round(params.globalPitch)));
         if (params.globalH !== DEFAULTS.globalH) sp.set('globalH', String(Math.round(params.globalH)));
+        if (params.globalD !== DEFAULTS.globalD) sp.set('globalD', String(round(params.globalD)));
+        if (params.globalUD !== DEFAULTS.globalUD) sp.set('globalUD', String(round(params.globalUD)));
+        if (params.globalLR !== DEFAULTS.globalLR) sp.set('globalLR', String(round(params.globalLR)));
+        if (params.dBase !== DEFAULTS.dBase) sp.set('dBase', String(round(params.dBase)));
         // Arrays
         if (!arraysEqual(params.plyYaw, DEFAULT_ARR.yaw)) sp.set('yaw', toCSV(params.plyYaw));
         if (!arraysEqual(params.plyRoll, DEFAULT_ARR.roll)) sp.set('roll', toCSV(params.plyRoll));
         if (!arraysEqual(params.plyPitch, DEFAULT_ARR.pitch)) sp.set('pitch', toCSV(params.plyPitch));
         if (!arraysEqual(params.plyH, DEFAULT_ARR.h)) sp.set('h', toCSV(params.plyH));
+        if (!arraysEqual(params.plyD, DEFAULT_ARR.d)) sp.set('d', toCSV(params.plyD));
+        if (!arraysEqual(params.plyUD, DEFAULT_ARR.ud)) sp.set('ud', toCSV(params.plyUD));
+        if (!arraysEqual(params.plyLR, DEFAULT_ARR.lr)) sp.set('lr', toCSV(params.plyLR));
         // Replace URL without reloading
         const base = location.origin + location.pathname;
         const query = sp.toString();
