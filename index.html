@@ -178,6 +178,8 @@
               const target = 0.6; // target bounding sphere radius in world units
               baseScale = target / bs.radius;
             }
+            // Center geometry so rotations happen around its local center
+            geom.center();
             points.scale.setScalar(baseScale * params.pointScale);
 
             const base = polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION);
