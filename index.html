@@ -85,6 +85,7 @@
       const ELEVATION = 0.0; // y-position for both images and PLYs
       const DEG2RAD = Math.PI / 180;
       const RAD2DEG = 180 / Math.PI;
+      const CSV_DELIM = ';';
       const DEFAULTS = { centerSize: 1.25, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff', useCenterImage: true, showLabels: true, imgAlpha: 1.0, globalYaw: 0, globalPitch: 0, globalRoll: 0, globalH: 0, dBase: PLY_OFFSET, globalD: 0, globalUD: 0, globalLR: 0 };
       const params = { ...DEFAULTS };
       // Default yaw per PLY (deg) to face edge tangent, normalized to [0, 360)
@@ -921,7 +922,6 @@
         const p = Math.pow(10, d);
         return Math.round(n * p) / p;
       }
-      const CSV_DELIM = ';';
       function toCSVInt(arr) { return arr.map(v => Math.round(v)).join(CSV_DELIM); }
       function toCSVFloat(arr, dp = 2) {
         return arr.map(v => round(parseFloat(v) || 0, dp)).join(CSV_DELIM);
