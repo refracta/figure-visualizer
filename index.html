@@ -82,6 +82,8 @@
       const ELEVATION = 0.0; // y-position for both images and PLYs
       const DEFAULTS = { sphereRadius: SPHERE_BASE_RADIUS, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff' };
       const params = { ...DEFAULTS };
+      // Per-PLY yaw rotation offsets (degrees)
+      params.plyRotation = [0, 0, 0, 0, 0];
 
       const group = new THREE.Group();
       scene.add(group);
@@ -93,6 +95,7 @@
       // storage for created meshes for interactive updates
       const planes = new Array(COUNT); // { mesh, aspect }
       const models = new Array(COUNT); // { mesh }
+      const DEG2RAD = Math.PI / 180;
 
       function polarPosition(radius, angle, y = 0) {
         return new THREE.Vector3(
@@ -121,9 +124,11 @@
           const m = models[k];
           if (m && m.mesh) {
             m.mesh.position.copy(polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION));
-            // Orient along edge tangent direction (CCTV capture direction)
+            // Orient along edge tangent direction, then apply per-PLY yaw (deg)
             const tangent = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle));
             m.mesh.lookAt(m.mesh.position.clone().sub(tangent));
+            const yaw = (params.plyRotation[k] || 0) * DEG2RAD;
+            m.mesh.rotateY(yaw);
             if (m.baseScale) {
               m.mesh.scale.setScalar(m.baseScale * params.pointScale);
             }
@@ -184,9 +189,11 @@
 
             const base = polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION);
             points.position.copy(base);
-            // Orient along edge tangent direction (CCTV capture direction)
+            // Orient along edge tangent direction, then apply per-PLY yaw (deg)
             const tangent = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle));
             points.lookAt(points.position.clone().sub(tangent));
+            const yaw = (params.plyRotation[index] || 0) * DEG2RAD;
+            points.rotateY(yaw);
 
             group.add(points);
             models[index] = { mesh: points, baseScale };
@@ -251,6 +258,31 @@
           <input id="pointScale" type="range" min="0.2" max="10.0" step="0.01" value="${DEFAULTS.pointScale}">
           <div class="val" id="pointScaleVal">${DEFAULTS.pointScale.toFixed(2)}×</div>
         </div>
+        <div class="row">
+          <label for="plyRot1">PLY 1 Rot</label>
+          <input id="plyRot1" type="range" min="-180" max="180" step="1" value="${(0).toFixed(0)}">
+          <div class="val" id="plyRot1Val">${(0).toFixed(0)}°</div>
+        </div>
+        <div class="row">
+          <label for="plyRot2">PLY 2 Rot</label>
+          <input id="plyRot2" type="range" min="-180" max="180" step="1" value="${(0).toFixed(0)}">
+          <div class="val" id="plyRot2Val">${(0).toFixed(0)}°</div>
+        </div>
+        <div class="row">
+          <label for="plyRot3">PLY 3 Rot</label>
+          <input id="plyRot3" type="range" min="-180" max="180" step="1" value="${(0).toFixed(0)}">
+          <div class="val" id="plyRot3Val">${(0).toFixed(0)}°</div>
+        </div>
+        <div class="row">
+          <label for="plyRot4">PLY 4 Rot</label>
+          <input id="plyRot4" type="range" min="-180" max="180" step="1" value="${(0).toFixed(0)}">
+          <div class="val" id="plyRot4Val">${(0).toFixed(0)}°</div>
+        </div>
+        <div class="row">
+          <label for="plyRot5">PLY 5 Rot</label>
+          <input id="plyRot5" type="range" min="-180" max="180" step="1" value="${(0).toFixed(0)}">
+          <div class="val" id="plyRot5Val">${(0).toFixed(0)}°</div>
+        </div>
       `;
       document.body.appendChild(ui);
 
@@ -290,12 +322,27 @@
           updateBackground();
         });
       }
+      function bindPlyRot(id, idx) {
+        const el = document.getElementById(id);
+        const val = document.getElementById(id + 'Val');
+        el.addEventListener('input', () => {
+          const deg = parseFloat(el.value);
+          params.plyRotation[idx] = deg;
+          val.textContent = `${deg.toFixed(0)}°`;
+          updateLayout();
+        });
+      }
       bindSlider('sphereRadius', 'sphereRadius');
       bindSlider('ringRadius', 'ringRadius');
       bindSlider('spriteHeight', 'spriteHeight');
       bindSlider('pointSize', 'pointSize');
       bindSlider('pointScale', 'pointScale');
       bindColor('bgColor', 'bgColor');
+      bindPlyRot('plyRot1', 0);
+      bindPlyRot('plyRot2', 1);
+      bindPlyRot('plyRot3', 2);
+      bindPlyRot('plyRot4', 3);
+      bindPlyRot('plyRot5', 4);
       // initialize background from default
       updateBackground();
     </script>
