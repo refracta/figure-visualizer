@@ -139,6 +139,10 @@
         const vCenterImg = bool('useCenterImage'); if (typeof vCenterImg === 'boolean') params.useCenterImage = vCenterImg;
         const vShowLabels = bool('showLabels'); if (typeof vShowLabels === 'boolean') params.showLabels = vShowLabels;
         const vImgAlpha = num('imgAlpha'); if (!isNaN(vImgAlpha)) params.imgAlpha = Math.max(0, Math.min(1, vImgAlpha));
+        const vGD = num('globalD'); if (!isNaN(vGD)) params.globalD = vGD;
+        const vGUD = num('globalUD'); if (!isNaN(vGUD)) params.globalUD = vGUD;
+        const vGLR = num('globalLR'); if (!isNaN(vGLR)) params.globalLR = vGLR;
+        const vDB = num('dBase'); if (!isNaN(vDB)) params.dBase = vDB;
         const vGY = num('globalYaw'); if (!isNaN(vGY)) params.globalYaw = norm360(vGY);
         const vGR = num('globalRoll'); if (!isNaN(vGR)) params.globalRoll = norm360(vGR);
         const vGP = num('globalPitch'); if (!isNaN(vGP)) params.globalPitch = norm360(vGP);
