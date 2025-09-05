@@ -117,7 +117,8 @@
 
       // ---- URL query parsing ----
       function parseArrayCSV(str, len, normFn) {
-        const parts = String(str).split(',');
+        // Accept both ';' and ',' for backward compatibility
+        const parts = String(str).split(/[;,]/);
         const out = new Array(len);
         for (let i = 0; i < len; i++) {
           const v = parseFloat(parts[i]);
@@ -920,9 +921,10 @@
         const p = Math.pow(10, d);
         return Math.round(n * p) / p;
       }
-      function toCSVInt(arr) { return arr.map(v => Math.round(v)).join(','); }
+      const CSV_DELIM = ';';
+      function toCSVInt(arr) { return arr.map(v => Math.round(v)).join(CSV_DELIM); }
       function toCSVFloat(arr, dp = 2) {
-        return arr.map(v => round(parseFloat(v) || 0, dp)).join(',');
+        return arr.map(v => round(parseFloat(v) || 0, dp)).join(CSV_DELIM);
       }
       function syncURL() {
         const sp = new URLSearchParams();
