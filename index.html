@@ -13,12 +13,15 @@
       #info a { color: #9dd7ff; text-decoration: none; }
       #ui {
         position: absolute; top: 10px; right: 10px; color: #e6e6e6; font: 12px/1.25 system-ui, -apple-system, Segoe UI, Roboto, Arial;
-        background: rgba(0,0,0,0.55); padding: 10px 12px; border-radius: 10px; width: 260px; box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+        background: rgba(0,0,0,0.55); padding: 10px 12px; border-radius: 10px; width: 280px; box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+        max-height: calc(100vh - 20px); overflow-y: auto; backdrop-filter: blur(4px);
       }
       #ui .row { display: grid; grid-template-columns: 1fr 3fr 48px; gap: 8px; align-items: center; margin: 6px 0; }
       #ui label { color: #c9d1d9; }
       #ui input[type="range"] { width: 100%; }
       #ui .val { text-align: right; font-variant-numeric: tabular-nums; color: #9fb3c8; }
+      #ui .section { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15); }
+      #ui .title { font-weight: 600; color: #dce2ea; margin-bottom: 4px; letter-spacing: .02em; }
     </style>
     <!-- Using ES modules from CDN (examples/jsm) -->
   </head>
@@ -82,7 +85,7 @@
       const ELEVATION = 0.0; // y-position for both images and PLYs
       const DEG2RAD = Math.PI / 180;
       const RAD2DEG = 180 / Math.PI;
-      const DEFAULTS = { centerSize: SPHERE_BASE_RADIUS, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff', useCenterImage: false, globalYaw: 0, globalPitch: 0, globalRoll: 0 };
+      const DEFAULTS = { centerSize: 1.25, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff', useCenterImage: true, globalYaw: 0, globalPitch: 0, globalRoll: 0 };
       const params = { ...DEFAULTS };
       // Default yaw per PLY (deg) to face edge tangent, normalized to [0, 360)
       const DEFAULT_PLY_YAW_DEG = Array.from({ length: COUNT }, (_, k) => {
@@ -376,9 +379,24 @@
           <div class="val" id="plyYaw5Val">${DEFAULT_PLY_YAW_DEG[4].toFixed(0)}°</div>
         </div>
         <div class="row">
-          <label for="plyPitch5">PLY 5 Pitch</label>
-          <input id="plyPitch5" type="range" min="0" max="360" step="1" value="0">
-          <div class="val" id="plyPitch5Val">0°</div>
+          <label for="plyRoll1">PLY 1 Roll</label>
+          <input id="plyRoll1" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyRoll1Val">0°</div>
+        </div>
+        <div class="row">
+          <label for="plyRoll2">PLY 2 Roll</label>
+          <input id="plyRoll2" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyRoll2Val">0°</div>
+        </div>
+        <div class="row">
+          <label for="plyRoll3">PLY 3 Roll</label>
+          <input id="plyRoll3" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyRoll3Val">0°</div>
+        </div>
+        <div class="row">
+          <label for="plyRoll4">PLY 4 Roll</label>
+          <input id="plyRoll4" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyRoll4Val">0°</div>
         </div>
         <div class="row">
           <label for="plyRoll5">PLY 5 Roll</label>
@@ -386,19 +404,47 @@
           <div class="val" id="plyRoll5Val">0°</div>
         </div>
         <div class="row">
-          <label for="globalYaw">PC Global Yaw</label>
-          <input id="globalYaw" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalYaw}">
-          <div class="val" id="globalYawVal">${DEFAULTS.globalYaw.toFixed(0)}°</div>
+          <label for="plyPitch1">PLY 1 Pitch</label>
+          <input id="plyPitch1" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyPitch1Val">0°</div>
         </div>
         <div class="row">
-          <label for="globalPitch">PC Global Pitch</label>
-          <input id="globalPitch" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalPitch}">
-          <div class="val" id="globalPitchVal">${DEFAULTS.globalPitch.toFixed(0)}°</div>
+          <label for="plyPitch2">PLY 2 Pitch</label>
+          <input id="plyPitch2" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyPitch2Val">0°</div>
         </div>
         <div class="row">
-          <label for="globalRoll">PC Global Roll</label>
-          <input id="globalRoll" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalRoll}">
-          <div class="val" id="globalRollVal">${DEFAULTS.globalRoll.toFixed(0)}°</div>
+          <label for="plyPitch3">PLY 3 Pitch</label>
+          <input id="plyPitch3" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyPitch3Val">0°</div>
+        </div>
+        <div class="row">
+          <label for="plyPitch4">PLY 4 Pitch</label>
+          <input id="plyPitch4" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyPitch4Val">0°</div>
+        </div>
+        <div class="row">
+          <label for="plyPitch5">PLY 5 Pitch</label>
+          <input id="plyPitch5" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyPitch5Val">0°</div>
+        </div>
+        <div class="section">
+          <div class="title">Rotation (Global)</div>
+          <div class="row">
+            <label for="globalYaw">Global Yaw</label>
+            <input id="globalYaw" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalYaw}">
+            <div class="val" id="globalYawVal">${DEFAULTS.globalYaw.toFixed(0)}°</div>
+          </div>
+          <div class="row">
+            <label for="globalRoll">Global Roll</label>
+            <input id="globalRoll" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalRoll}">
+            <div class="val" id="globalRollVal">${DEFAULTS.globalRoll.toFixed(0)}°</div>
+          </div>
+          <div class="row">
+            <label for="globalPitch">Global Pitch</label>
+            <input id="globalPitch" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalPitch}">
+            <div class="val" id="globalPitchVal">${DEFAULTS.globalPitch.toFixed(0)}°</div>
+          </div>
         </div>
         <div class="row">
           <label for="globalYaw">PC Global Rot</label>
