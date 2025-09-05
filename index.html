@@ -82,22 +82,27 @@
       const ELEVATION = 0.0; // y-position for both images and PLYs
       const DEG2RAD = Math.PI / 180;
       const RAD2DEG = 180 / Math.PI;
-      const DEFAULTS = { sphereRadius: SPHERE_BASE_RADIUS, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff', globalYaw: 0 };
+      const DEFAULTS = { centerSize: SPHERE_BASE_RADIUS, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff', useCenterImage: false, globalYaw: 0, globalPitch: 0, globalRoll: 0 };
       const params = { ...DEFAULTS };
       // Default yaw per PLY (deg) to face edge tangent, normalized to [0, 360)
-      const DEFAULT_PLY_ROT_DEG = Array.from({ length: COUNT }, (_, k) => {
+      const DEFAULT_PLY_YAW_DEG = Array.from({ length: COUNT }, (_, k) => {
         const angleVertex = (k / COUNT) * Math.PI * 2 - Math.PI / 2;
         const angle = angleVertex + Math.PI / COUNT; // edge midpoint
         const yaw = -angle; // atan2(-sin(angle), cos(angle)) = -angle
         const deg = (yaw * RAD2DEG) % 360;
         return (deg + 360) % 360;
       });
-      params.plyRotation = DEFAULT_PLY_ROT_DEG.slice();
+      const norm360 = (deg) => ((deg % 360) + 360) % 360;
+      params.plyYaw = DEFAULT_PLY_YAW_DEG.map(norm360);
+      params.plyPitch = Array.from({ length: COUNT }, () => 0);
+      params.plyRoll = Array.from({ length: COUNT }, () => 0);
 
       const group = new THREE.Group();
       scene.add(group);
       const pcGroup = new THREE.Group(); // holds only the point clouds
       group.add(pcGroup);
+      let centerSprite = null;
+      let centerSpriteAspect = 1;
 
       // helpers
       const texLoader = new THREE.TextureLoader();
@@ -115,10 +120,22 @@
         );
       }
 
-      function updateLayout() {
-        // update sphere size via scaling
-        const sphereScale = params.sphereRadius / SPHERE_BASE_RADIUS;
+      function updateCenter() {
+        const size = params.centerSize;
+        // Toggle visibility
+        sphere.visible = !params.useCenterImage;
+        if (centerSprite) centerSprite.visible = !!params.useCenterImage;
+        // Sizes
+        const sphereScale = size / SPHERE_BASE_RADIUS;
         sphere.scale.setScalar(sphereScale);
+        if (centerSprite) {
+          centerSprite.scale.set(size * centerSpriteAspect, size, 1);
+          centerSprite.position.set(0, 0, 0);
+        }
+      }
+
+      function updateLayout() {
+        updateCenter();
 
         // Global rotation now applies per point cloud about its own center (handled below)
         pcGroup.rotation.set(0, 0, 0);
@@ -137,10 +154,11 @@
           const m = models[k];
           if (m && m.mesh) {
             m.mesh.position.copy(polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION));
-            // Rotate each point cloud around its own center: per-PLY yaw + globalYaw
-            const yawDeg = (params.plyRotation[k] || 0) + (params.globalYaw || 0);
-            const yaw = yawDeg * DEG2RAD;
-            m.mesh.rotation.set(0, yaw, 0);
+            // Rotate each point cloud around its own center: add global + per-PLY rotations (degrees)
+            const yawDeg = (params.plyYaw[k] || 0) + (params.globalYaw || 0);
+            const pitchDeg = (params.plyPitch[k] || 0) + (params.globalPitch || 0);
+            const rollDeg = (params.plyRoll[k] || 0) + (params.globalRoll || 0);
+            m.mesh.rotation.set(pitchDeg * DEG2RAD, yawDeg * DEG2RAD, rollDeg * DEG2RAD);
             if (m.baseScale) {
               m.mesh.scale.setScalar(m.baseScale * params.pointScale);
             }
@@ -201,10 +219,11 @@
 
             const base = polarPosition(params.ringRadius + PLY_OFFSET, angle, ELEVATION);
             points.position.copy(base);
-            // Absolute yaw per PLY + global yaw (rotate around own center without moving)
-            const yawDeg = (params.plyRotation[index] || 0) + (params.globalYaw || 0);
-            const yaw = yawDeg * DEG2RAD;
-            points.rotation.set(0, yaw, 0);
+            // Apply per-PLY + global rotations (deg)
+            const yawDeg = (params.plyYaw[index] || 0) + (params.globalYaw || 0);
+            const pitchDeg = (params.plyPitch[index] || 0) + (params.globalPitch || 0);
+            const rollDeg = (params.plyRoll[index] || 0) + (params.globalRoll || 0);
+            points.rotation.set(pitchDeg * DEG2RAD, yawDeg * DEG2RAD, rollDeg * DEG2RAD);
 
             pcGroup.add(points);
             models[index] = { mesh: points, baseScale };
@@ -217,6 +236,23 @@
       }
 
       for (let k = 0; k < COUNT; k++) addSpriteWithPLY(k);
+
+      // center image (billboard) setup
+      texLoader.load(
+        'resources/image/center.png',
+        (tex) => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          centerSpriteAspect = tex.image ? (tex.image.width / tex.image.height) : 1;
+          const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+          centerSprite = new THREE.Sprite(mat);
+          centerSprite.center.set(0.5, 0.5);
+          scene.add(centerSprite);
+          // initialize center visibility and size
+          updateCenter();
+        },
+        undefined,
+        (err) => { console.warn('center.png 로드 실패: resources/image/center.png', err); }
+      );
 
       // resize
       window.addEventListener('resize', () => {
@@ -245,9 +281,14 @@
           <div class="val" id="bgColorVal">${DEFAULTS.bgColor.toUpperCase()}</div>
         </div>
         <div class="row">
-          <label for="sphereRadius">Sphere Radius</label>
-          <input id="sphereRadius" type="range" min="0.1" max="1.5" step="0.01" value="${DEFAULTS.sphereRadius}">
-          <div class="val" id="sphereRadiusVal">${DEFAULTS.sphereRadius.toFixed(2)}</div>
+          <label for="useCenterImage">Center Image</label>
+          <input id="useCenterImage" type="checkbox" ${DEFAULTS.useCenterImage ? 'checked' : ''}>
+          <div class="val" id="useCenterImageVal">${DEFAULTS.useCenterImage ? 'ON' : 'OFF'}</div>
+        </div>
+        <div class="row">
+          <label for="centerSize">Center Size</label>
+          <input id="centerSize" type="range" min="0.1" max="3.0" step="0.01" value="${DEFAULTS.centerSize}">
+          <div class="val" id="centerSizeVal">${DEFAULTS.centerSize.toFixed(2)}</div>
         </div>
         <div class="row">
           <label for="ringRadius">Image Distance</label>
@@ -270,29 +311,94 @@
           <div class="val" id="pointScaleVal">${DEFAULTS.pointScale.toFixed(2)}×</div>
         </div>
         <div class="row">
-          <label for="plyRot1">PLY 1 Rot</label>
-          <input id="plyRot1" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_ROT_DEG[0].toFixed(0)}">
-          <div class="val" id="plyRot1Val">${DEFAULT_PLY_ROT_DEG[0].toFixed(0)}°</div>
+          <label for="plyYaw1">PLY 1 Yaw</label>
+          <input id="plyYaw1" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_YAW_DEG[0].toFixed(0)}">
+          <div class="val" id="plyYaw1Val">${DEFAULT_PLY_YAW_DEG[0].toFixed(0)}°</div>
         </div>
         <div class="row">
-          <label for="plyRot2">PLY 2 Rot</label>
-          <input id="plyRot2" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_ROT_DEG[1].toFixed(0)}">
-          <div class="val" id="plyRot2Val">${DEFAULT_PLY_ROT_DEG[1].toFixed(0)}°</div>
+          <label for="plyPitch1">PLY 1 Pitch</label>
+          <input id="plyPitch1" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyPitch1Val">0°</div>
         </div>
         <div class="row">
-          <label for="plyRot3">PLY 3 Rot</label>
-          <input id="plyRot3" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_ROT_DEG[2].toFixed(0)}">
-          <div class="val" id="plyRot3Val">${DEFAULT_PLY_ROT_DEG[2].toFixed(0)}°</div>
+          <label for="plyRoll1">PLY 1 Roll</label>
+          <input id="plyRoll1" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyRoll1Val">0°</div>
         </div>
         <div class="row">
-          <label for="plyRot4">PLY 4 Rot</label>
-          <input id="plyRot4" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_ROT_DEG[3].toFixed(0)}">
-          <div class="val" id="plyRot4Val">${DEFAULT_PLY_ROT_DEG[3].toFixed(0)}°</div>
+          <label for="plyYaw2">PLY 2 Yaw</label>
+          <input id="plyYaw2" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_YAW_DEG[1].toFixed(0)}">
+          <div class="val" id="plyYaw2Val">${DEFAULT_PLY_YAW_DEG[1].toFixed(0)}°</div>
         </div>
         <div class="row">
-          <label for="plyRot5">PLY 5 Rot</label>
-          <input id="plyRot5" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_ROT_DEG[4].toFixed(0)}">
-          <div class="val" id="plyRot5Val">${DEFAULT_PLY_ROT_DEG[4].toFixed(0)}°</div>
+          <label for="plyPitch2">PLY 2 Pitch</label>
+          <input id="plyPitch2" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyPitch2Val">0°</div>
+        </div>
+        <div class="row">
+          <label for="plyRoll2">PLY 2 Roll</label>
+          <input id="plyRoll2" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyRoll2Val">0°</div>
+        </div>
+        <div class="row">
+          <label for="plyYaw3">PLY 3 Yaw</label>
+          <input id="plyYaw3" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_YAW_DEG[2].toFixed(0)}">
+          <div class="val" id="plyYaw3Val">${DEFAULT_PLY_YAW_DEG[2].toFixed(0)}°</div>
+        </div>
+        <div class="row">
+          <label for="plyPitch3">PLY 3 Pitch</label>
+          <input id="plyPitch3" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyPitch3Val">0°</div>
+        </div>
+        <div class="row">
+          <label for="plyRoll3">PLY 3 Roll</label>
+          <input id="plyRoll3" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyRoll3Val">0°</div>
+        </div>
+        <div class="row">
+          <label for="plyYaw4">PLY 4 Yaw</label>
+          <input id="plyYaw4" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_YAW_DEG[3].toFixed(0)}">
+          <div class="val" id="plyYaw4Val">${DEFAULT_PLY_YAW_DEG[3].toFixed(0)}°</div>
+        </div>
+        <div class="row">
+          <label for="plyPitch4">PLY 4 Pitch</label>
+          <input id="plyPitch4" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyPitch4Val">0°</div>
+        </div>
+        <div class="row">
+          <label for="plyRoll4">PLY 4 Roll</label>
+          <input id="plyRoll4" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyRoll4Val">0°</div>
+        </div>
+        <div class="row">
+          <label for="plyYaw5">PLY 5 Yaw</label>
+          <input id="plyYaw5" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_YAW_DEG[4].toFixed(0)}">
+          <div class="val" id="plyYaw5Val">${DEFAULT_PLY_YAW_DEG[4].toFixed(0)}°</div>
+        </div>
+        <div class="row">
+          <label for="plyPitch5">PLY 5 Pitch</label>
+          <input id="plyPitch5" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyPitch5Val">0°</div>
+        </div>
+        <div class="row">
+          <label for="plyRoll5">PLY 5 Roll</label>
+          <input id="plyRoll5" type="range" min="0" max="360" step="1" value="0">
+          <div class="val" id="plyRoll5Val">0°</div>
+        </div>
+        <div class="row">
+          <label for="globalYaw">PC Global Yaw</label>
+          <input id="globalYaw" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalYaw}">
+          <div class="val" id="globalYawVal">${DEFAULTS.globalYaw.toFixed(0)}°</div>
+        </div>
+        <div class="row">
+          <label for="globalPitch">PC Global Pitch</label>
+          <input id="globalPitch" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalPitch}">
+          <div class="val" id="globalPitchVal">${DEFAULTS.globalPitch.toFixed(0)}°</div>
+        </div>
+        <div class="row">
+          <label for="globalRoll">PC Global Roll</label>
+          <input id="globalRoll" type="range" min="0" max="360" step="1" value="${DEFAULTS.globalRoll}">
+          <div class="val" id="globalRollVal">${DEFAULTS.globalRoll.toFixed(0)}°</div>
         </div>
         <div class="row">
           <label for="globalYaw">PC Global Rot</label>
@@ -323,11 +429,33 @@
             val.textContent = params[key].toFixed(1) + ' px';
           } else if (key === 'pointScale') {
             val.textContent = params[key].toFixed(2) + '×';
-          } else if (key === 'globalYaw') {
+          } else if (key === 'globalYaw' || key === 'globalPitch' || key === 'globalRoll') {
             val.textContent = params[key].toFixed(0) + '°';
           } else {
             val.textContent = params[key].toFixed(2);
           }
+          updateLayout();
+        });
+      }
+      function bindCheckbox(id, key) {
+        const el = document.getElementById(id);
+        const val = document.getElementById(id + 'Val');
+        const update = () => {
+          params[key] = !!el.checked;
+          val.textContent = params[key] ? 'ON' : 'OFF';
+          updateLayout();
+        };
+        el.addEventListener('change', update);
+        update();
+      }
+      function bindAngleSlider(id, arr, idx) {
+        const el = document.getElementById(id);
+        const val = document.getElementById(id + 'Val');
+        el.addEventListener('input', () => {
+          let deg = parseFloat(el.value);
+          deg = ((deg % 360) + 360) % 360;
+          arr[idx] = deg;
+          val.textContent = `${deg.toFixed(0)}°`;
           updateLayout();
         });
       }
@@ -340,30 +468,31 @@
           updateBackground();
         });
       }
-      function bindPlyRot(id, idx) {
-        const el = document.getElementById(id);
-        const val = document.getElementById(id + 'Val');
-        el.addEventListener('input', () => {
-          let deg = parseFloat(el.value);
-          // Normalize into [0, 360)
-          deg = ((deg % 360) + 360) % 360;
-          params.plyRotation[idx] = deg;
-          val.textContent = `${deg.toFixed(0)}°`;
-          updateLayout();
-        });
-      }
-      bindSlider('sphereRadius', 'sphereRadius');
+      bindCheckbox('useCenterImage', 'useCenterImage');
+      bindSlider('centerSize', 'centerSize');
       bindSlider('ringRadius', 'ringRadius');
       bindSlider('spriteHeight', 'spriteHeight');
       bindSlider('pointSize', 'pointSize');
       bindSlider('pointScale', 'pointScale');
+      bindAngleSlider('plyYaw1', params.plyYaw, 0);
+      bindAngleSlider('plyPitch1', params.plyPitch, 0);
+      bindAngleSlider('plyRoll1', params.plyRoll, 0);
+      bindAngleSlider('plyYaw2', params.plyYaw, 1);
+      bindAngleSlider('plyPitch2', params.plyPitch, 1);
+      bindAngleSlider('plyRoll2', params.plyRoll, 1);
+      bindAngleSlider('plyYaw3', params.plyYaw, 2);
+      bindAngleSlider('plyPitch3', params.plyPitch, 2);
+      bindAngleSlider('plyRoll3', params.plyRoll, 2);
+      bindAngleSlider('plyYaw4', params.plyYaw, 3);
+      bindAngleSlider('plyPitch4', params.plyPitch, 3);
+      bindAngleSlider('plyRoll4', params.plyRoll, 3);
+      bindAngleSlider('plyYaw5', params.plyYaw, 4);
+      bindAngleSlider('plyPitch5', params.plyPitch, 4);
+      bindAngleSlider('plyRoll5', params.plyRoll, 4);
       bindSlider('globalYaw', 'globalYaw');
+      bindSlider('globalPitch', 'globalPitch');
+      bindSlider('globalRoll', 'globalRoll');
       bindColor('bgColor', 'bgColor');
-      bindPlyRot('plyRot1', 0);
-      bindPlyRot('plyRot2', 1);
-      bindPlyRot('plyRot3', 2);
-      bindPlyRot('plyRot4', 3);
-      bindPlyRot('plyRot5', 4);
       // initialize background from default
       updateBackground();
     </script>
