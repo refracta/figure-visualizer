@@ -84,12 +84,13 @@
       const RAD2DEG = 180 / Math.PI;
       const DEFAULTS = { sphereRadius: SPHERE_BASE_RADIUS, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff' };
       const params = { ...DEFAULTS };
-      // Default yaw per PLY (deg) to face edge tangent
+      // Default yaw per PLY (deg) to face edge tangent, normalized to [0, 360)
       const DEFAULT_PLY_ROT_DEG = Array.from({ length: COUNT }, (_, k) => {
         const angleVertex = (k / COUNT) * Math.PI * 2 - Math.PI / 2;
         const angle = angleVertex + Math.PI / COUNT; // edge midpoint
         const yaw = -angle; // atan2(-sin(angle), cos(angle)) = -angle
-        return yaw * RAD2DEG;
+        const deg = (yaw * RAD2DEG) % 360;
+        return (deg + 360) % 360;
       });
       params.plyRotation = DEFAULT_PLY_ROT_DEG.slice();
 
@@ -263,27 +264,27 @@
         </div>
         <div class="row">
           <label for="plyRot1">PLY 1 Rot</label>
-          <input id="plyRot1" type="range" min="-180" max="180" step="1" value="${DEFAULT_PLY_ROT_DEG[0].toFixed(0)}">
+          <input id="plyRot1" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_ROT_DEG[0].toFixed(0)}">
           <div class="val" id="plyRot1Val">${DEFAULT_PLY_ROT_DEG[0].toFixed(0)}°</div>
         </div>
         <div class="row">
           <label for="plyRot2">PLY 2 Rot</label>
-          <input id="plyRot2" type="range" min="-180" max="180" step="1" value="${DEFAULT_PLY_ROT_DEG[1].toFixed(0)}">
+          <input id="plyRot2" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_ROT_DEG[1].toFixed(0)}">
           <div class="val" id="plyRot2Val">${DEFAULT_PLY_ROT_DEG[1].toFixed(0)}°</div>
         </div>
         <div class="row">
           <label for="plyRot3">PLY 3 Rot</label>
-          <input id="plyRot3" type="range" min="-180" max="180" step="1" value="${DEFAULT_PLY_ROT_DEG[2].toFixed(0)}">
+          <input id="plyRot3" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_ROT_DEG[2].toFixed(0)}">
           <div class="val" id="plyRot3Val">${DEFAULT_PLY_ROT_DEG[2].toFixed(0)}°</div>
         </div>
         <div class="row">
           <label for="plyRot4">PLY 4 Rot</label>
-          <input id="plyRot4" type="range" min="-180" max="180" step="1" value="${DEFAULT_PLY_ROT_DEG[3].toFixed(0)}">
+          <input id="plyRot4" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_ROT_DEG[3].toFixed(0)}">
           <div class="val" id="plyRot4Val">${DEFAULT_PLY_ROT_DEG[3].toFixed(0)}°</div>
         </div>
         <div class="row">
           <label for="plyRot5">PLY 5 Rot</label>
-          <input id="plyRot5" type="range" min="-180" max="180" step="1" value="${DEFAULT_PLY_ROT_DEG[4].toFixed(0)}">
+          <input id="plyRot5" type="range" min="0" max="360" step="1" value="${DEFAULT_PLY_ROT_DEG[4].toFixed(0)}">
           <div class="val" id="plyRot5Val">${DEFAULT_PLY_ROT_DEG[4].toFixed(0)}°</div>
         </div>
       `;
@@ -329,7 +330,9 @@
         const el = document.getElementById(id);
         const val = document.getElementById(id + 'Val');
         el.addEventListener('input', () => {
-          const deg = parseFloat(el.value);
+          let deg = parseFloat(el.value);
+          // Normalize into [0, 360)
+          deg = ((deg % 360) + 360) % 360;
           params.plyRotation[idx] = deg;
           val.textContent = `${deg.toFixed(0)}°`;
           updateLayout();
