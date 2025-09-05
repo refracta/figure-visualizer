@@ -905,8 +905,9 @@
         const p = Math.pow(10, d);
         return Math.round(n * p) / p;
       }
-      function toCSV(arr) {
-        return arr.map(v => Math.round(v)).join(',');
+      function toCSVInt(arr) { return arr.map(v => Math.round(v)).join(','); }
+      function toCSVFloat(arr, dp = 2) {
+        return arr.map(v => round(parseFloat(v) || 0, dp)).join(',');
       }
       function syncURL() {
         const sp = new URLSearchParams();
@@ -929,14 +930,15 @@
         if (params.globalLR !== DEFAULTS.globalLR) sp.set('globalLR', String(round(params.globalLR)));
         if (params.dBase !== DEFAULTS.dBase) sp.set('dBase', String(round(params.dBase)));
         // Arrays
-        if (!arraysEqual(params.plyYaw, DEFAULT_ARR.yaw)) sp.set('yaw', toCSV(params.plyYaw));
-        if (!arraysEqual(params.plyRoll, DEFAULT_ARR.roll)) sp.set('roll', toCSV(params.plyRoll));
-        if (!arraysEqual(params.plyPitch, DEFAULT_ARR.pitch)) sp.set('pitch', toCSV(params.plyPitch));
-        if (!arraysEqual(params.plyH, DEFAULT_ARR.h)) sp.set('h', toCSV(params.plyH));
-        if (!arraysEqual(params.plyD, DEFAULT_ARR.d)) sp.set('d', toCSV(params.plyD));
-        if (!arraysEqual(params.plyUD, DEFAULT_ARR.ud)) sp.set('ud', toCSV(params.plyUD));
-        if (!arraysEqual(params.plyLR, DEFAULT_ARR.lr)) sp.set('lr', toCSV(params.plyLR));
-        if (!arraysEqual(params.plyImgAlpha || DEFAULT_ARR.img, DEFAULT_ARR.img)) sp.set('img', toCSV(params.plyImgAlpha || DEFAULT_ARR.img));
+        if (!arraysEqual(params.plyYaw, DEFAULT_ARR.yaw)) sp.set('yaw', toCSVInt(params.plyYaw));
+        if (!arraysEqual(params.plyRoll, DEFAULT_ARR.roll)) sp.set('roll', toCSVInt(params.plyRoll));
+        if (!arraysEqual(params.plyPitch, DEFAULT_ARR.pitch)) sp.set('pitch', toCSVInt(params.plyPitch));
+        if (!arraysEqual(params.plyH, DEFAULT_ARR.h)) sp.set('h', toCSVInt(params.plyH));
+        // Always include D/UD/LR arrays, even if equal to defaults
+        sp.set('d', toCSVFloat(params.plyD || DEFAULT_ARR.d, 2));
+        sp.set('ud', toCSVFloat(params.plyUD || DEFAULT_ARR.ud, 2));
+        sp.set('lr', toCSVFloat(params.plyLR || DEFAULT_ARR.lr, 2));
+        if (!arraysEqual(params.plyImgAlpha || DEFAULT_ARR.img, DEFAULT_ARR.img)) sp.set('img', toCSVFloat(params.plyImgAlpha || DEFAULT_ARR.img, 2));
         // Replace URL without reloading
         const base = location.origin + location.pathname;
         const query = sp.toString();
