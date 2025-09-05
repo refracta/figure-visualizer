@@ -85,7 +85,7 @@
       const ELEVATION = 0.0; // y-position for both images and PLYs
       const DEG2RAD = Math.PI / 180;
       const RAD2DEG = 180 / Math.PI;
-      const DEFAULTS = { centerSize: 1.25, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff', useCenterImage: true, showLabels: true, globalYaw: 0, globalPitch: 0, globalRoll: 0, globalH: 0, dBase: PLY_OFFSET, globalD: 0, globalUD: 0, globalLR: 0 };
+      const DEFAULTS = { centerSize: 1.25, ringRadius: 2.8, spriteHeight: 2.0, pointSize: 3.0, pointScale: 1.0, bgColor: '#ffffff', useCenterImage: true, showLabels: true, imgAlpha: 1.0, globalYaw: 0, globalPitch: 0, globalRoll: 0, globalH: 0, dBase: PLY_OFFSET, globalD: 0, globalUD: 0, globalLR: 0 };
       const params = { ...DEFAULTS };
       // Default yaw per PLY (deg) to face edge tangent, normalized to [0, 360)
       const DEFAULT_PLY_YAW_DEG = Array.from({ length: COUNT }, (_, k) => {
@@ -112,6 +112,7 @@
         d: Array.from({ length: COUNT }, () => 0),
         ud: Array.from({ length: COUNT }, () => 0),
         lr: Array.from({ length: COUNT }, () => 0),
+        img: Array.from({ length: COUNT }, () => 1),
       };
 
       // ---- URL query parsing ----
@@ -137,6 +138,7 @@
         const vBG = str('bgColor'); if (vBG) params.bgColor = vBG;
         const vCenterImg = bool('useCenterImage'); if (typeof vCenterImg === 'boolean') params.useCenterImage = vCenterImg;
         const vShowLabels = bool('showLabels'); if (typeof vShowLabels === 'boolean') params.showLabels = vShowLabels;
+        const vImgAlpha = num('imgAlpha'); if (!isNaN(vImgAlpha)) params.imgAlpha = Math.max(0, Math.min(1, vImgAlpha));
         const vGY = num('globalYaw'); if (!isNaN(vGY)) params.globalYaw = norm360(vGY);
         const vGR = num('globalRoll'); if (!isNaN(vGR)) params.globalRoll = norm360(vGR);
         const vGP = num('globalPitch'); if (!isNaN(vGP)) params.globalPitch = norm360(vGP);
@@ -148,6 +150,7 @@
         if (q.has('d')) params.plyD = parseArrayCSV(q.get('d'), COUNT);
         if (q.has('ud')) params.plyUD = parseArrayCSV(q.get('ud'), COUNT);
         if (q.has('lr')) params.plyLR = parseArrayCSV(q.get('lr'), COUNT);
+        if (q.has('img')) params.plyImgAlpha = parseArrayCSV(q.get('img'), COUNT, (v) => Math.max(0, Math.min(1, parseFloat(v))));
       }
       loadParamsFromURL();
 
@@ -242,10 +245,23 @@
             p.mesh.scale.set(params.spriteHeight * p.aspect, params.spriteHeight, 1);
             // update label size/visibility
             if (p.label) {
-              const labelSize = params.spriteHeight * 0.38;
-              p.label.scale.set(labelSize, labelSize, 1);
+              const labelWorld = params.spriteHeight * 0.22;
+              // counter-scale to keep label size consistent regardless of plane scale
+              p.label.scale.set(
+                labelWorld / p.mesh.scale.x,
+                labelWorld / p.mesh.scale.y,
+                1
+              );
+              // place near top-center of the image
+              p.label.position.set(0, 0.38, 0.001);
               p.label.visible = !!params.showLabels;
             }
+            // image opacity
+            const per = (params.plyImgAlpha && params.plyImgAlpha[k] != null) ? params.plyImgAlpha[k] : 1;
+            const a = Math.max(0, Math.min(1, (params.imgAlpha ?? 1) * per));
+            p.mesh.material.transparent = true;
+            p.mesh.material.opacity = a;
+            p.mesh.material.needsUpdate = true;
           }
 
           const m = models[k];
@@ -297,8 +313,10 @@
             const lblMat = new THREE.SpriteMaterial({ map: lblTex, transparent: true, depthWrite: false, depthTest: false });
             const label = new THREE.Sprite(lblMat);
             label.renderOrder = 10;
-            const labelSize = params.spriteHeight * 0.38;
-            label.scale.set(labelSize, labelSize, 1);
+            // set small size normalized against parent scale
+            const labelWorld = params.spriteHeight * 0.22;
+            label.scale.set(labelWorld / plane.scale.x, labelWorld / plane.scale.y, 1);
+            label.position.set(0, 0.38, 0.001);
             label.visible = !!params.showLabels;
             plane.add(label);
 
@@ -412,6 +430,40 @@
             <label for="centerSize">Center Size</label>
             <input id="centerSize" type="range" min="0.1" max="3.0" step="0.01" value="${params.centerSize}">
             <div class="val" id="centerSizeVal">${params.centerSize.toFixed(2)}</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="title">Image Opacity</div>
+          <div class="row">
+            <label for="imgAlpha">Global Opacity</label>
+            <input id="imgAlpha" type="range" min="0" max="1" step="0.01" value="${params.imgAlpha}">
+            <div class="val" id="imgAlphaVal">${params.imgAlpha.toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="img1">Img 1</label>
+            <input id="img1" type="range" min="0" max="1" step="0.01" value="${((params.plyImgAlpha&&params.plyImgAlpha[0])||1).toFixed(2)}">
+            <div class="val" id="img1Val">${((params.plyImgAlpha&&params.plyImgAlpha[0])||1).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="img2">Img 2</label>
+            <input id="img2" type="range" min="0" max="1" step="0.01" value="${((params.plyImgAlpha&&params.plyImgAlpha[1])||1).toFixed(2)}">
+            <div class="val" id="img2Val">${((params.plyImgAlpha&&params.plyImgAlpha[1])||1).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="img3">Img 3</label>
+            <input id="img3" type="range" min="0" max="1" step="0.01" value="${((params.plyImgAlpha&&params.plyImgAlpha[2])||1).toFixed(2)}">
+            <div class="val" id="img3Val">${((params.plyImgAlpha&&params.plyImgAlpha[2])||1).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="img4">Img 4</label>
+            <input id="img4" type="range" min="0" max="1" step="0.01" value="${((params.plyImgAlpha&&params.plyImgAlpha[3])||1).toFixed(2)}">
+            <div class="val" id="img4Val">${((params.plyImgAlpha&&params.plyImgAlpha[3])||1).toFixed(2)}</div>
+          </div>
+          <div class="row">
+            <label for="img5">Img 5</label>
+            <input id="img5" type="range" min="0" max="1" step="0.01" value="${((params.plyImgAlpha&&params.plyImgAlpha[4])||1).toFixed(2)}">
+            <div class="val" id="img5Val">${((params.plyImgAlpha&&params.plyImgAlpha[4])||1).toFixed(2)}</div>
           </div>
         </div>
 
@@ -720,6 +772,20 @@
           syncURL();
         });
       }
+      function bindImgSlider(id, idx) {
+        if (!params.plyImgAlpha) params.plyImgAlpha = Array.from({ length: COUNT }, () => 1);
+        const el = document.getElementById(id);
+        const val = document.getElementById(id + 'Val');
+        el.addEventListener('input', () => {
+          let v = parseFloat(el.value);
+          if (isNaN(v)) v = 1;
+          v = Math.max(0, Math.min(1, v));
+          params.plyImgAlpha[idx] = v;
+          val.textContent = v.toFixed(2);
+          updateLayout();
+          syncURL();
+        });
+      }
       function bindCheckbox(id, key) {
         const el = document.getElementById(id);
         const val = document.getElementById(id + 'Val');
@@ -770,6 +836,7 @@
       bindSlider('centerSize', 'centerSize');
       bindSlider('ringRadius', 'ringRadius');
       bindSlider('spriteHeight', 'spriteHeight');
+      bindSlider('imgAlpha', 'imgAlpha');
       bindSlider('pointSize', 'pointSize');
       bindSlider('pointScale', 'pointScale');
       bindAngleSlider('plyYaw1', params.plyYaw, 0);
@@ -810,6 +877,11 @@
       bindSlider('globalUD', 'globalUD');
       bindSlider('globalLR', 'globalLR');
       bindSlider('dBase', 'dBase');
+      bindImgSlider('img1', 0);
+      bindImgSlider('img2', 1);
+      bindImgSlider('img3', 2);
+      bindImgSlider('img4', 3);
+      bindImgSlider('img5', 4);
       bindAngleSlider('plyH1', params.plyH, 0);
       bindAngleSlider('plyH2', params.plyH, 1);
       bindAngleSlider('plyH3', params.plyH, 2);
@@ -843,6 +915,7 @@
         if ((params.bgColor || '').toLowerCase() !== (DEFAULTS.bgColor || '').toLowerCase()) sp.set('bgColor', params.bgColor);
         if (params.useCenterImage !== DEFAULTS.useCenterImage) sp.set('useCenterImage', params.useCenterImage ? '1' : '0');
         if (params.showLabels !== DEFAULTS.showLabels) sp.set('showLabels', params.showLabels ? '1' : '0');
+        if (params.imgAlpha !== DEFAULTS.imgAlpha) sp.set('imgAlpha', String(round(params.imgAlpha, 2)));
         if (params.globalYaw !== DEFAULTS.globalYaw) sp.set('globalYaw', String(Math.round(params.globalYaw)));
         if (params.globalRoll !== DEFAULTS.globalRoll) sp.set('globalRoll', String(Math.round(params.globalRoll)));
         if (params.globalPitch !== DEFAULTS.globalPitch) sp.set('globalPitch', String(Math.round(params.globalPitch)));
@@ -859,6 +932,7 @@
         if (!arraysEqual(params.plyD, DEFAULT_ARR.d)) sp.set('d', toCSV(params.plyD));
         if (!arraysEqual(params.plyUD, DEFAULT_ARR.ud)) sp.set('ud', toCSV(params.plyUD));
         if (!arraysEqual(params.plyLR, DEFAULT_ARR.lr)) sp.set('lr', toCSV(params.plyLR));
+        if (!arraysEqual(params.plyImgAlpha || DEFAULT_ARR.img, DEFAULT_ARR.img)) sp.set('img', toCSV(params.plyImgAlpha || DEFAULT_ARR.img));
         // Replace URL without reloading
         const base = location.origin + location.pathname;
         const query = sp.toString();
